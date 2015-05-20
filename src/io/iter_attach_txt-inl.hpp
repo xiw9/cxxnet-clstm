@@ -22,7 +22,7 @@ class AttachTxtIterator : public IIterator<DataBatch> {
   }
   virtual void SetParam(const char *name, const char *val) {
     base_->SetParam(name, val);
-    if (!strcmp(name, "filename")) filename_ = val;
+    if (!strcmp(name, "txtfilename")) filename_ = val;
     if (!strcmp(name, "batch_size"))  batch_size_ = (index_t)atoi(val);
     if (!strcmp(name, "round_batch")) round_batch_ = atoi(val);
   }
