@@ -122,16 +122,17 @@ class LSTMLayer : public ILayer<xpu> {
     seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
     
     for (index_t i = 0; i < n_seq; i++){
-      if (i == 0){
-	concat2D(xhprev, xt[i][0], ht[n_seq-1][0]);
-	LSTM_Forward(xhprev, ct[n_seq-1][0], ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]);
-      }else{
-	flush = 1.0f - mshadow::expr::broadcast<0>(seq_label[i][0][0], ht[i-1][0].shape_);
-	t = flush * ht[i-1][0];
-	concat2D(xhprev, xt[i][0], t);
-	t = flush * ct[i-1][0];
-	LSTM_Forward(xhprev, t, ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]);
-      }
+      flush = 1.0f - mshadow::expr::broadcast<0>(seq_label[i][0][0], ht[i-1][0].shape_);
+      if (i != 0)
+        t = flush * ht[i-1][0];
+      else
+        t = flush * ht[n_seq-1][0];
+      concat2D(xhprev, xt[i][0], t);
+      if (i != 0)
+        t = flush * ct[i-1][0];
+      else
+        t = flush * ct[n_seq-1][0];
+      LSTM_Forward(xhprev, t, ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]); 
     }
     ht.shape_ = node_out.shape_;
     mshadow::Copy(node_out, ht, ht.stream_);
