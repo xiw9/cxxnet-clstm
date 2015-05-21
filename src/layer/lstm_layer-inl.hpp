@@ -123,9 +123,8 @@ class LSTMLayer : public ILayer<xpu> {
     
     for (index_t i = 0; i < n_seq; i++){
       if (i == 0){
-	flush = 0.0f;
-	concat2D(xhprev, xt[i][0], flush);
-	LSTM_Forward(xhprev, flush, ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]);
+	concat2D(xhprev, xt[i][0], ht[n_seq-1][0]);
+	LSTM_Forward(xhprev, ct[n_seq-1][0], ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]);
       }else{
 	flush = 1.0f - mshadow::expr::broadcast<0>(seq_label[i][0][0], ht[i-1][0].shape_);
 	t = flush * ht[i-1][0];
