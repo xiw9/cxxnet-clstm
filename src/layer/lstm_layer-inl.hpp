@@ -26,11 +26,13 @@ class LSTMLayer : public ILayer<xpu> {
     pvisitor->Visit("bias", bias_, gbias_);
   }
   virtual void InitModel(void) {
+    //ifog weights: input, forget, output and cell gate * input vector and hidden state
+    //ifog bias: input, forget, output and cell gate
     wmat_.Resize(mshadow::Shape2(param_.num_hidden * 4, param_.num_hidden + param_.num_input_node));
     bias_.Resize(mshadow::Shape1(param_.num_hidden * 4));
     param_.RandInitWeight(this->prnd_, wmat_, wmat_.size(1), wmat_.size(0));
     bias_ = param_.init_bias;
-
+    
     gwmat_.Resize(wmat_.shape_);
     gbias_.Resize(bias_.shape_);
     gwmat_ = 0.0f; gbias_ = 0.0f; 
@@ -42,7 +44,7 @@ class LSTMLayer : public ILayer<xpu> {
   }
   virtual void LoadModel(utils::IStream &fi) {
     utils::Check(fi.Read(&param_, sizeof(LayerParam)) != 0,
-                  "LSTMLayer:LoadModel invalid model file");    
+                 "LSTMLayer:LoadModel invalid model file");    
     wmat_.LoadBinary(fi);
     bias_.LoadBinary(fi); 
     gwmat_.Resize(wmat_.shape_);
@@ -97,6 +99,15 @@ class LSTMLayer : public ILayer<xpu> {
     this->initTemp();
   }
   
+  /*
+    nodes_in[0] size: [batch_size][1][1][input_width]
+    nodes_in[1] size: [batch_size][1][1][1]
+    nodes_out[0] size: [batch_size][1][1][hidden_size]
+    
+    The input sequence nodes_in[0] should be:
+    Seq[0][i], Seq[1][j], ... , Seq[parallel_size][k], Seq[0][i + 1], Seq[1][j + 1], ... , Seq[parallel_size][k + 1], ...
+    The correspond sequence label (in nodes_in[1]) should be '1' when it is the beginning of a sequence.
+  */
   virtual void Forward(bool is_train,
                        const std::vector<Node<xpu>*> &nodes_in,
                        const std::vector<Node<xpu>*> &nodes_out,
@@ -168,46 +179,60 @@ class LSTMLayer : public ILayer<xpu> {
 
  protected:  
   void LSTM_Forward(mshadow::Tensor<xpu, 2> xhprev,
-			   mshadow::Tensor<xpu, 2> cprev, 
-			   mshadow::Tensor<xpu, 2> h,      
-			   mshadow::Tensor<xpu, 2> c,
-			   mshadow::Tensor<xpu, 2> i,
-			   mshadow::Tensor<xpu, 2> f,
-			   mshadow::Tensor<xpu, 2> o,
-			   mshadow::Tensor<xpu, 2> g,
-			   mshadow::Tensor<xpu, 2> c_tanh){
+                    mshadow::Tensor<xpu, 2> cprev, 
+                    mshadow::Tensor<xpu, 2> h,      
+                    mshadow::Tensor<xpu, 2> c,
+                    mshadow::Tensor<xpu, 2> i,
+                    mshadow::Tensor<xpu, 2> f,
+                    mshadow::Tensor<xpu, 2> o,
+                    mshadow::Tensor<xpu, 2> g,
+                    mshadow::Tensor<xpu, 2> c_tanh){
     using namespace cxxnet::op;
     using namespace mshadow::expr;
+    /*
+      li_t = w_ix * x_t + w_ih * h_t-1 + b_i
+      lf_t = w_fx * x_t + w_fh * h_t-1 + b_f
+      lo_t = w_ox * x_t + w_oh * h_t-1 + b_o
+      lg_t = w_gx * x_t + w_gh * h_t-1 + b_g
+      lifog = [li_t, lf_t, lo_t, lg_t]
+     */
     lifog = broadcast<0>(bias_, lifog.shape_);
     lifog += dot(wmat_, xhprev.T());
-
     mshadow::Tensor<xpu, 2> li, lf, lo, lg;
     li = lifog.Slice(0 * param_.num_hidden, 1 * param_.num_hidden);
     lf = lifog.Slice(1 * param_.num_hidden, 2 * param_.num_hidden);
     lo = lifog.Slice(2 * param_.num_hidden, 3 * param_.num_hidden);
     lg = lifog.Slice(3 * param_.num_hidden, 4 * param_.num_hidden);
-    
+    /*
+      i_t = sigmoid(li_t)
+      f_t = sigmoid(lf_t)
+      o_t = sigmoid(lo_t)
+      g_t = tanh(lg_t)
+     */
     i = F<sigmoid>(li.T());
     f = F<sigmoid>(lf.T());
     o = F<sigmoid>(lo.T());
     g = F<tanh>(lg.T());
-
+    /*
+      c_t = f_t * c_t-1 + i_t * g_t
+      h_t = o_t * tanh(c_t)
+     */
     c = f * cprev + i * g;
     c_tanh = F<tanh>(c);
     h = o * c_tanh;
   }
 
   void LSTM_Backprop(mshadow::Tensor<xpu, 2> d_h,
-			    mshadow::Tensor<xpu, 2> xhprev,
-			    mshadow::Tensor<xpu, 2> cprev,
-			    mshadow::Tensor<xpu, 2> c_tanh,
-			    mshadow::Tensor<xpu, 2> i,
-			    mshadow::Tensor<xpu, 2> f,
-			    mshadow::Tensor<xpu, 2> o,
-			    mshadow::Tensor<xpu, 2> g,
-			    mshadow::Tensor<xpu, 2> d_xhprev,
-			    mshadow::Tensor<xpu, 2> d_c,
-			    mshadow::Tensor<xpu, 2> d_cprev){
+                     mshadow::Tensor<xpu, 2> xhprev,
+                     mshadow::Tensor<xpu, 2> cprev,
+                     mshadow::Tensor<xpu, 2> c_tanh,
+                     mshadow::Tensor<xpu, 2> i,
+                     mshadow::Tensor<xpu, 2> f,
+                     mshadow::Tensor<xpu, 2> o,
+                     mshadow::Tensor<xpu, 2> g,
+                     mshadow::Tensor<xpu, 2> d_xhprev,
+                     mshadow::Tensor<xpu, 2> d_c,
+                     mshadow::Tensor<xpu, 2> d_cprev){
     using namespace cxxnet::op;
     using namespace mshadow::expr;
     
@@ -282,6 +307,7 @@ class LSTMLayer : public ILayer<xpu> {
   /*! \brief batched BPTT */
   size_t parallel_size, seq_length;
 
+  /*! \brief var in LSTM layer */
   mshadow::TensorContainer<xpu, 4> it, ft, ot, gt, ct, c_tanht, ht;
   mshadow::TensorContainer<xpu, 2> flush, t;
   mshadow::TensorContainer<xpu, 2> xhprev;
@@ -290,8 +316,6 @@ class LSTMLayer : public ILayer<xpu> {
   mshadow::TensorContainer<xpu, 2> d_lifog;
   mshadow::TensorContainer<xpu, 2> d_c;
   mshadow::TensorContainer<xpu, 2> d_cprev;
- 
-
 };
 }  // namespace layer
 }  // namespace cxxnet
