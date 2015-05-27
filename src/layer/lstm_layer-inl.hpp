@@ -32,7 +32,8 @@ class LSTMLayer : public ILayer<xpu> {
     bias_.Resize(mshadow::Shape1(param_.num_hidden * 4));
     param_.RandInitWeight(this->prnd_, wmat_, wmat_.size(1), wmat_.size(0));
     bias_ = param_.init_bias;
-    
+    // TODO: fancy_forget_bias_init
+    // https://gist.github.com/karpathy/587454dc0146a6ae21fc
     gwmat_.Resize(wmat_.shape_);
     gbias_.Resize(bias_.shape_);
     gwmat_ = 0.0f; gbias_ = 0.0f; 
@@ -89,6 +90,9 @@ class LSTMLayer : public ILayer<xpu> {
                    "LSTMLayer: input hidden nodes is not consistent");
     }
     this->seq_length = nodes_in[0]->data.size(0);
+    nodes_in[0]->must_contiguous = true;
+    nodes_in[1]->must_contiguous = true;
+    nodes_out[0]->must_contiguous = true;
     this->initTemp();
   }
 
@@ -116,13 +120,19 @@ class LSTMLayer : public ILayer<xpu> {
     mshadow::Tensor<xpu, 4> &node_out = nodes_out[0]->data;
     mshadow::Tensor<xpu, 4> xt = node_in;
     mshadow::Tensor<xpu, 4> seq_label = nodes_in[1]->data;
+
+    CHECK(nodes_out[0]->data.CheckContiguous());
+    CHECK(xt.CheckContiguous());
+    CHECK(seq_label.CheckContiguous());
+    CHECK(ht.CheckContiguous());
     
     index_t n_seq = seq_length / parallel_size;
     xt.shape_ = mshadow::Shape4(n_seq,1,parallel_size,node_in.size(3));
     seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
+    seq_label.stride_ = parallel_size;
     
     for (index_t i = 0; i < n_seq; i++){
-      flush = 1.0f - mshadow::expr::broadcast<0>(seq_label[i][0][0], ht[i-1][0].shape_);
+      flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
       if (i != 0)
         t = flush * ht[i-1][0];
       else
@@ -148,13 +158,18 @@ class LSTMLayer : public ILayer<xpu> {
     mshadow::Tensor<xpu, 4> d_xt = node_in;
     mshadow::Tensor<xpu, 4> d_ht = node_out;
     mshadow::Tensor<xpu, 4> seq_label = nodes_in[1]->data;
+
+    CHECK(d_xt.CheckContiguous());
+    CHECK(d_ht.CheckContiguous());
+    CHECK(seq_label.CheckContiguous());
     
     index_t n_seq = seq_length / parallel_size;
     d_xt.shape_ = mshadow::Shape4(n_seq,1,parallel_size,node_in.size(3));
     d_ht.shape_ = mshadow::Shape4(n_seq,1,parallel_size,node_out.size(3));
     seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
+    seq_label.stride_ = parallel_size;
     d_cprev = 0.0f;
-
+    
     for (index_t i = n_seq - 1; i < n_seq; i--){ //unsigned int >=0
       mshadow::Copy(d_c, d_cprev, d_cprev.stream_);
       if (i == 0){
@@ -162,7 +177,7 @@ class LSTMLayer : public ILayer<xpu> {
         concat2D(xhprev, d_xt[i][0], flush);
 	LSTM_Backprop(d_ht[i][0], xhprev, flush, c_tanht[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], d_xhprev, d_c, d_cprev);
       }else{
-	flush = 1.0f - mshadow::expr::broadcast<0>(seq_label[i][0][0], ht[i-1][0].shape_);
+        flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
    	t = flush * ht[i-1][0];
 	concat2D(xhprev, d_xt[i][0], t);
 	t = flush * ct[i-1][0];
@@ -256,10 +271,12 @@ class LSTMLayer : public ILayer<xpu> {
   }
 
   inline void tensor2To4(mshadow::Tensor<xpu, 2> a, mshadow::Tensor<xpu, 4> *a4){
+    CHECK(a.CheckContiguous());
     a4->set_stream(a.stream_);
     a4->dptr_ = a.dptr_;
     a4->stride_ = a.stride_;
     a4->shape_ = mshadow::Shape4(1,1,a.size(0),a.size(1));
+    CHECK(a4->CheckContiguous());
   }
 
   inline void concat2D(mshadow::Tensor<xpu, 2> dst, mshadow::Tensor<xpu, 2> a, mshadow::Tensor<xpu, 2> b){
@@ -270,6 +287,7 @@ class LSTMLayer : public ILayer<xpu> {
     tensor2To4(a, &a4);
     tensor2To4(b, &b4);
     dst4 = mshadow::expr::concat<3>(a4, b4);
+    CHECK(dst.CheckContiguous());
   }
 
   inline void initTemp(){
