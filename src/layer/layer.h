@@ -355,7 +355,7 @@ inline LayerType GetLayerType(const char *type) {
   if (!strcmp(type, "batch_norm")) return kBatchNorm;
   if (!strcmp(type, "batch_norm_no_ma")) return kBatchNorm_no_ma;
   if (!strcmp(type, "lstm")) return kLSTM;
-  if (!strcmp(type, "lstm")) return kCLSTM;
+  if (!strcmp(type, "clstm")) return kCLSTM;
   #if CXXNET_USE_CAFFE_ADAPTOR
   if (!strcmp(type, "caffe")) return kCaffe;
   #endif

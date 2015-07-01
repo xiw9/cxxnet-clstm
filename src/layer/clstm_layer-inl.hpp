@@ -47,30 +47,41 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
     d_lifog.set_stream(stream);
     d_c.set_stream(stream);
     d_cprev.set_stream(stream);
+
+    conv_node_in.data.set_stream(stream);
+    conv_node_out.data.set_stream(stream);
   }
 
   virtual void InitConnection(const std::vector<Node<xpu>*> &nodes_in,
                               const std::vector<Node<xpu>*> &nodes_out,
                               ConnectState<xpu> *p_cstate) {
+    conv_node_in.data.shape_ = mshadow::Shape4(
+        this->parallel_size, nodes_in[0]->data.size(1) + Conv::param_.num_channel / 4,
+        nodes_in[0]->data.size(2), nodes_in[0]->data.size(3));
+    conv_node_in.must_contiguous = true;
+    conv_node_out.must_contiguous = true;
+    conv_nodes_in.push_back(&conv_node_in);
+    conv_nodes_out.push_back(&conv_node_out);
+    conv_node_in.AllocSpace();
+    Conv::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
+    conv_node_out.AllocSpace();
+    if (conv_node_out.data.size(2) != conv_node_in.data.size(2) ||
+        conv_node_out.data.size(3) != conv_node_in.data.size(3)) {
+      utils::Error("Conv output should be the same size as the input");
+    }
+
+    nodes_out[0]->data.shape_ =
+        mshadow::Shape4(nodes_in[0]->data.size(0), Conv::param_.num_channel / 4, conv_node_out.data.size(2), conv_node_out.data.size(3));
     nodes_in[0]->must_contiguous = true;
     nodes_in[1]->must_contiguous = true;
     nodes_out[0]->must_contiguous = true;
 
     this->seq_length = nodes_in[0]->data.size(0);
     this->num_hidden_in = nodes_in[0]->data.size(1) * nodes_in[0]->data.size(2) * nodes_in[0]->data.size(3);
-    this->num_hidden_out = nodes_out[0]->data.size(1) * nodes_out[0]->data.size(2) * nodes_out[0]->data.size(3) / 4;
+    this->num_hidden_out = nodes_out[0]->data.size(1) * nodes_out[0]->data.size(2) * nodes_out[0]->data.size(3);
     this->initTemp();
 
-    conv_node_in.data.shape_ = mshadow::Shape4(
-        this->parallel_size, nodes_in[0]->data.size(1) + Conv::param_.num_channel,
-        nodes_in[0]->data.size(2), nodes_in[0]->data.size(3));
-    conv_nodes_in.push_back(&conv_node_in);
-    conv_nodes_out.push_back(&conv_node_out);
-    Conv::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
-    if (nodes_out[0]->data.size(2) != nodes_in[0]->data.size(2) ||
-        nodes_out[0]->data.size(3) != nodes_in[0]->data.size(3)) {
-      utils::Error("Conv output should be the same size as the input");
-    }
+
   }
 
 /*  virtual void OnBatchSizeChanged(const std::vector<Node<xpu>*> &nodes_in,
@@ -91,6 +102,7 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
     
     index_t n_seq = seq_length / parallel_size;
     xt.shape_ = mshadow::Shape4(n_seq,1, parallel_size, num_hidden_in);
+    xt.stride_ = num_hidden_in;
     seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
     seq_label.stride_ = parallel_size;
     
@@ -101,19 +113,16 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
       else
         t = flush * ht[n_seq-1][0];
       concat2D(xhprev, xt[i][0], t);
-      conv_node_in.data.dptr_=xhprev.dptr_;
-      conv_node_in.data.dptr_=lifog.dptr_;
+      conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
       Conv::Forward(is_train, conv_nodes_in, conv_nodes_out, p_cstate);
+      lifog = mshadow::expr::reshape(conv_node_out.data.T(), lifog.shape_);
       if (i != 0)
         t = flush * ct[i-1][0];
       else
         t = flush * ct[n_seq-1][0];
-      lifog = lifog.T();
       LSTM_Forward(lifog, t, ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]); 
     }
-    ht.shape_ = node_out.shape_;
-    mshadow::Copy(node_out, ht, ht.stream_);
-    ht.shape_ = ct.shape_;
+    node_out = mshadow::expr::reshape(ht, node_out.shape_);
 
   }
 
@@ -129,7 +138,9 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
 
     index_t n_seq = seq_length / parallel_size;
     d_xt.shape_ = mshadow::Shape4(n_seq,1,parallel_size,num_hidden_in);
+    d_xt.stride_ = num_hidden_in;
     d_ht.shape_ = mshadow::Shape4(n_seq,1,parallel_size,num_hidden_out);
+    d_ht.stride_ = num_hidden_out;
     seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
     seq_label.stride_ = parallel_size;
     d_cprev = 0.0f;
@@ -140,22 +151,20 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
         flush = 0.0f;
         concat2D(xhprev, d_xt[i][0], flush);
         LSTM_Backprop(d_ht[i][0], flush, c_tanht[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], d_lifog, d_c, d_cprev);
-        conv_node_in.data.dptr_=xhprev.dptr_;
-        conv_node_out.data.dptr_=d_lifog.dptr_;
-        conv_node_out.data = conv_node_out.data.T();
+        conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
+        conv_node_out.data = mshadow::expr::reshape(d_lifog.T(), conv_node_out.data.shape_);
         Conv::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
-        d_xhprev = conv_node_in.mat().T();
+        d_xhprev = mshadow::expr::reshape(conv_node_in.mat().T(), d_xhprev.shape_);        
       }else{
         flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
         t = flush * ht[i-1][0];
         concat2D(xhprev, d_xt[i][0], t);
         t = flush * ct[i-1][0];
         LSTM_Backprop(d_ht[i][0], t, c_tanht[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], d_lifog, d_c, d_cprev);
-        conv_node_in.data.dptr_=xhprev.dptr_;
-        conv_node_out.data.dptr_=d_lifog.dptr_;
-        conv_node_out.data = conv_node_out.data.T();
+        conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
+        conv_node_out.data = mshadow::expr::reshape(d_lifog.T(), conv_node_out.data.shape_);
         Conv::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
-        d_xhprev = conv_node_in.mat().T();        
+        d_xhprev = mshadow::expr::reshape(conv_node_in.mat().T(), d_xhprev.shape_);        
         t = d_xhprev.Slice(num_hidden_in, num_hidden_in + num_hidden_out).T();
         d_ht[i-1][0] += flush * t;
         d_cprev *= flush;
