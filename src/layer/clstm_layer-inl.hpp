@@ -11,9 +11,10 @@ namespace cxxnet {
 namespace layer {
 
 template<typename xpu>
-class CLSTMLayer : public ConvolutionLayer<xpu> {
+//class CLSTMLayer : public ConvolutionLayer<xpu> {
+class CLSTMLayer : public FullConnectLayer<xpu> {
  public:
-  CLSTMLayer(mshadow::Random<xpu> *p_rnd) : Conv(p_rnd) {
+  CLSTMLayer(mshadow::Random<xpu> *p_rnd) : Parent(p_rnd) {
     this->parallel_size = 1;
   }
   virtual ~CLSTMLayer(void) {
@@ -22,14 +23,16 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
   }
 
   virtual void SetParam(const char *name, const char* val) {
-    Conv::SetParam(name, val);
+    Parent::SetParam(name, val);
     if (!strcmp(name, "parallel_size")) this->parallel_size = atoi(val);
-    if (Conv::param_.num_channel % 4 != 0)
+    if (!strcmp(name, "num_channel") && Parent::param_.num_channel % 4 != 0)
       utils::Error("num_channel mod 4 should be zero");
+    if (!strcmp(name, "num_hidden") && Parent::param_.num_hidden % 4 != 0)
+      utils::Error("num_hidden mod 4 should be zero");
   }
 
   virtual void SetStream(mshadow::Stream<xpu> *stream) {
-    Conv::SetStream(stream);
+    Parent::SetStream(stream);
 
     it.set_stream(stream);
     ft.set_stream(stream);
@@ -56,22 +59,26 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
                               const std::vector<Node<xpu>*> &nodes_out,
                               ConnectState<xpu> *p_cstate) {
     conv_node_in.data.shape_ = mshadow::Shape4(
-        this->parallel_size, nodes_in[0]->data.size(1) + Conv::param_.num_channel / 4,
+        this->parallel_size, nodes_in[0]->data.size(1) + Parent::param_.num_channel / 4,
         nodes_in[0]->data.size(2), nodes_in[0]->data.size(3));
+    conv_node_in.data.shape_ = mshadow::Shape4(this->parallel_size, 1, 1, nodes_in[0]->data.size(3) + Parent::param_.num_hidden / 4);
+    
     conv_node_in.must_contiguous = true;
     conv_node_out.must_contiguous = true;
     conv_nodes_in.push_back(&conv_node_in);
     conv_nodes_out.push_back(&conv_node_out);
     conv_node_in.AllocSpace();
-    Conv::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
+    Parent::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
     conv_node_out.AllocSpace();
-    if (conv_node_out.data.size(2) != conv_node_in.data.size(2) ||
+    /*if (conv_node_out.data.size(2) != conv_node_in.data.size(2) ||
         conv_node_out.data.size(3) != conv_node_in.data.size(3)) {
       utils::Error("Conv output should be the same size as the input");
-    }
+      }*/
 
     nodes_out[0]->data.shape_ =
-        mshadow::Shape4(nodes_in[0]->data.size(0), Conv::param_.num_channel / 4, conv_node_out.data.size(2), conv_node_out.data.size(3));
+        mshadow::Shape4(nodes_in[0]->data.size(0), Parent::param_.num_channel / 4, conv_node_out.data.size(2), conv_node_out.data.size(3));
+    nodes_out[0]->data.shape_ =
+        mshadow::Shape4(nodes_in[0]->data.size(0), 1, 1, Parent::param_.num_hidden / 4);
     nodes_in[0]->must_contiguous = true;
     nodes_in[1]->must_contiguous = true;
     nodes_out[0]->must_contiguous = true;
@@ -87,7 +94,7 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
 /*  virtual void OnBatchSizeChanged(const std::vector<Node<xpu>*> &nodes_in,
                                   const std::vector<Node<xpu>*> &nodes_out,
                                   ConnectState<xpu> *p_cstate) {
-    Conv::OnBatchSizeChanged(nodes_in, nodes_out, p_cstate);
+    Parent::OnBatchSizeChanged(nodes_in, nodes_out, p_cstate);
     this->seq_length = nodes_in[0]->data.size(0);
     this->num_hidden_out = nodes_out[0]->data.size(1) * nodes_out[0]->data.size(2) * nodes_out[0]->data.size(3) / 4;
     this->initTemp();
@@ -114,8 +121,8 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
         t = flush * ht[n_seq-1][0];
       concat2D(xhprev, xt[i][0], t);
       conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
-      Conv::Forward(is_train, conv_nodes_in, conv_nodes_out, p_cstate);
-      lifog = mshadow::expr::reshape(conv_node_out.data.T(), lifog.shape_);
+      Parent::Forward(is_train, conv_nodes_in, conv_nodes_out, p_cstate);
+      lifog = mshadow::expr::reshape(conv_node_out.mat().T(), lifog.shape_);
       if (i != 0)
         t = flush * ct[i-1][0];
       else
@@ -153,7 +160,7 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
         LSTM_Backprop(d_ht[i][0], flush, c_tanht[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], d_lifog, d_c, d_cprev);
         conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
         conv_node_out.data = mshadow::expr::reshape(d_lifog.T(), conv_node_out.data.shape_);
-        Conv::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
+        Parent::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
         d_xhprev = mshadow::expr::reshape(conv_node_in.mat().T(), d_xhprev.shape_);        
       }else{
         flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
@@ -163,7 +170,7 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
         LSTM_Backprop(d_ht[i][0], t, c_tanht[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], d_lifog, d_c, d_cprev);
         conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
         conv_node_out.data = mshadow::expr::reshape(d_lifog.T(), conv_node_out.data.shape_);
-        Conv::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
+        Parent::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
         d_xhprev = mshadow::expr::reshape(conv_node_in.mat().T(), d_xhprev.shape_);        
         t = d_xhprev.Slice(num_hidden_in, num_hidden_in + num_hidden_out).T();
         d_ht[i-1][0] += flush * t;
@@ -268,12 +275,12 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
   }
 
   inline void tensor2To4(mshadow::Tensor<xpu, 2> a, mshadow::Tensor<xpu, 4> *a4){
-    CHECK(a.CheckContiguous());
+    //CHECK(a.CheckContiguous());
     a4->set_stream(a.stream_);
     a4->dptr_ = a.dptr_;
     a4->stride_ = a.stride_;
     a4->shape_ = mshadow::Shape4(1,1,a.size(0),a.size(1));
-    CHECK(a4->CheckContiguous());
+    //CHECK(a4->CheckContiguous());
   }
 
   inline void concat2D(mshadow::Tensor<xpu, 2> dst, mshadow::Tensor<xpu, 2> a, mshadow::Tensor<xpu, 2> b){
@@ -284,10 +291,11 @@ class CLSTMLayer : public ConvolutionLayer<xpu> {
     tensor2To4(a, &a4);
     tensor2To4(b, &b4);
     dst4 = mshadow::expr::concat<3>(a4, b4);
-    CHECK(dst.CheckContiguous());
+    //CHECK(dst.CheckContiguous());
   }
 
-  typedef ConvolutionLayer<xpu> Conv;
+  //typedef ConvolutionLayer<xpu> Parent;
+  typedef FullConnectLayer<xpu> Parent;
   /*! \brief batched BPTT */
   size_t parallel_size, seq_length, num_hidden_in, num_hidden_out;
   /*! \brief var in LSTM layer */
