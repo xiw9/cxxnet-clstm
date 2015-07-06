@@ -10,9 +10,8 @@
 namespace cxxnet {
 namespace layer {
 
-template<typename xpu>
-//class CLSTMLayer : public ConvolutionLayer<xpu> {
-class CLSTMLayer : public FullConnectLayer<xpu> {
+template<typename xpu, typename inner>
+class CLSTMLayer : public inner {
  public:
   CLSTMLayer(mshadow::Random<xpu> *p_rnd) : Parent(p_rnd) {
     this->parallel_size = 1;
@@ -22,13 +21,15 @@ class CLSTMLayer : public FullConnectLayer<xpu> {
     conv_node_out.FreeSpace();
   }
 
-  virtual void SetParam(const char *name, const char* val) {
-    Parent::SetParam(name, val);
+  virtual void SetParam(const char *name, const char* val) {  
     if (!strcmp(name, "parallel_size")) this->parallel_size = atoi(val);
-    if (!strcmp(name, "num_channel") && Parent::param_.num_channel % 4 != 0)
-      utils::Error("num_channel mod 4 should be zero");
-    if (!strcmp(name, "num_hidden") && Parent::param_.num_hidden % 4 != 0)
-      utils::Error("num_hidden mod 4 should be zero");
+    if (!strcmp(name, "num_channel") || !strcmp(name, "num_hidden")){
+      char buf[16];
+      sprintf(buf, "%d", atoi(val) * 4);
+      Parent::SetParam(name, buf);
+    }
+    else
+      Parent::SetParam(name, val);
   }
 
   virtual void SetStream(mshadow::Stream<xpu> *stream) {
@@ -58,10 +59,13 @@ class CLSTMLayer : public FullConnectLayer<xpu> {
   virtual void InitConnection(const std::vector<Node<xpu>*> &nodes_in,
                               const std::vector<Node<xpu>*> &nodes_out,
                               ConnectState<xpu> *p_cstate) {
-    conv_node_in.data.shape_ = mshadow::Shape4(
-        this->parallel_size, nodes_in[0]->data.size(1) + Parent::param_.num_channel / 4,
-        nodes_in[0]->data.size(2), nodes_in[0]->data.size(3));
-    conv_node_in.data.shape_ = mshadow::Shape4(this->parallel_size, 1, 1, nodes_in[0]->data.size(3) + Parent::param_.num_hidden / 4);
+    if (nodes_in[0]->data.size(2) == 1){
+      conv_node_in.data.shape_ = mshadow::Shape4(this->parallel_size, 1, 1, nodes_in[0]->data.size(3) + Parent::param_.num_hidden / 4);
+    }else{
+      conv_node_in.data.shape_ = mshadow::Shape4(
+          this->parallel_size, nodes_in[0]->data.size(1) + Parent::param_.num_channel / 4,
+          nodes_in[0]->data.size(2), nodes_in[0]->data.size(3));      
+    }
     
     conv_node_in.must_contiguous = true;
     conv_node_out.must_contiguous = true;
@@ -70,15 +74,13 @@ class CLSTMLayer : public FullConnectLayer<xpu> {
     conv_node_in.AllocSpace();
     Parent::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
     conv_node_out.AllocSpace();
-    /*if (conv_node_out.data.size(2) != conv_node_in.data.size(2) ||
-        conv_node_out.data.size(3) != conv_node_in.data.size(3)) {
-      utils::Error("Conv output should be the same size as the input");
-      }*/
 
-    nodes_out[0]->data.shape_ =
-        mshadow::Shape4(nodes_in[0]->data.size(0), Parent::param_.num_channel / 4, conv_node_out.data.size(2), conv_node_out.data.size(3));
-    nodes_out[0]->data.shape_ =
-        mshadow::Shape4(nodes_in[0]->data.size(0), 1, 1, Parent::param_.num_hidden / 4);
+    if (nodes_in[0]->data.size(2) == 1){
+      nodes_out[0]->data.shape_ = mshadow::Shape4(nodes_in[0]->data.size(0), 1, 1, Parent::param_.num_hidden / 4);
+    }else{
+      nodes_out[0]->data.shape_ = mshadow::Shape4(nodes_in[0]->data.size(0), Parent::param_.num_channel / 4, conv_node_out.data.size(2), conv_node_out.data.size(3));
+    }
+
     nodes_in[0]->must_contiguous = true;
     nodes_in[1]->must_contiguous = true;
     nodes_out[0]->must_contiguous = true;
@@ -295,7 +297,7 @@ class CLSTMLayer : public FullConnectLayer<xpu> {
   }
 
   //typedef ConvolutionLayer<xpu> Parent;
-  typedef FullConnectLayer<xpu> Parent;
+  typedef inner Parent;
   /*! \brief batched BPTT */
   size_t parallel_size, seq_length, num_hidden_in, num_hidden_out;
   /*! \brief var in LSTM layer */
