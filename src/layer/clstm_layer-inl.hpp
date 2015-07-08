@@ -23,7 +23,7 @@ class CLSTMLayer : public inner {
 
   virtual void SetParam(const char *name, const char* val) {  
     if (!strcmp(name, "parallel_size")) this->parallel_size = atoi(val);
-    if (!strcmp(name, "num_channel") || !strcmp(name, "num_hidden")){
+    if (!strcmp(name, "nchannel") || !strcmp(name, "nhidden")){
       char buf[16];
       sprintf(buf, "%d", atoi(val) * 4);
       Parent::SetParam(name, buf);

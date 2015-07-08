@@ -72,7 +72,7 @@ ILayer<xpu>* CreateLayer_(LayerType type,
     case kMultiLogistic: return new MultiLogisticLayer<xpu>(label_info);
     //case kLSTM: return new LSTMLayer<xpu>(p_rnd);
     case kLSTM: return new CLSTMLayer<xpu, FullConnectLayer<xpu> >(p_rnd);
-    case kCLSTM: return new CLSTMLayer<xpu, CuDNNConvolutionLayer<xpu> >(p_rnd);
+    case kCLSTM: return new CLSTMLayer<xpu, ConvolutionLayer<xpu> >(p_rnd);
     #if CXXNET_USE_CAFFE_ADAPTOR
     case kCaffe: return new CaffeLayer<xpu>();
     #endif
