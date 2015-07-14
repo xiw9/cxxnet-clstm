@@ -47,7 +47,9 @@ class CLSTMLayer : public inner {
     t.set_stream(stream);
     xhprev.set_stream(stream);
     d_xhprev.set_stream(stream);
+    d_xhprevt.set_stream(stream);
     lifog.set_stream(stream);
+    lifogt.set_stream(stream);
     d_lifog.set_stream(stream);
     d_c.set_stream(stream);
     d_cprev.set_stream(stream);
@@ -71,8 +73,8 @@ class CLSTMLayer : public inner {
     conv_node_out.must_contiguous = true;
     conv_nodes_in.push_back(&conv_node_in);
     conv_nodes_out.push_back(&conv_node_out);
-    conv_node_in.AllocSpace();
     Parent::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
+    conv_node_in.AllocSpace();
     conv_node_out.AllocSpace();
 
     if (nodes_in[0]->data.size(2) == 1){
@@ -88,12 +90,12 @@ class CLSTMLayer : public inner {
     this->seq_length = nodes_in[0]->data.size(0);
     this->num_hidden_in = nodes_in[0]->data.size(1) * nodes_in[0]->data.size(2) * nodes_in[0]->data.size(3);
     this->num_hidden_out = nodes_out[0]->data.size(1) * nodes_out[0]->data.size(2) * nodes_out[0]->data.size(3);
-    this->initTemp();
+    this->InitCLSTM();
 
 
   }
 
-/*  virtual void OnBatchSizeChanged(const std::vector<Node<xpu>*> &nodes_in,
+  /*virtual void OnBatchSizeChanged(const std::vector<Node<xpu>*> &nodes_in,
                                   const std::vector<Node<xpu>*> &nodes_out,
                                   ConnectState<xpu> *p_cstate) {
     Parent::OnBatchSizeChanged(nodes_in, nodes_out, p_cstate);
@@ -101,6 +103,7 @@ class CLSTMLayer : public inner {
     this->num_hidden_out = nodes_out[0]->data.size(1) * nodes_out[0]->data.size(2) * nodes_out[0]->data.size(3) / 4;
     this->initTemp();
   }*/
+
   virtual void Forward(bool is_train,
                        const std::vector<Node<xpu>*> &nodes_in,
                        const std::vector<Node<xpu>*> &nodes_out,
@@ -109,6 +112,9 @@ class CLSTMLayer : public inner {
     mshadow::Tensor<xpu, 4> xt = nodes_in[0]->data;
     mshadow::Tensor<xpu, 4> seq_label = nodes_in[1]->data;
     
+    CHECK(seq_label.CheckContiguous());
+    CHECK(xt.CheckContiguous());
+
     index_t n_seq = seq_length / parallel_size;
     xt.shape_ = mshadow::Shape4(n_seq,1, parallel_size, num_hidden_in);
     xt.stride_ = num_hidden_in;
@@ -119,12 +125,17 @@ class CLSTMLayer : public inner {
       flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
       if (i != 0)
         t = flush * ht[i-1][0];
-      else
-        t = flush * ht[n_seq-1][0];
+      else{
+        if (is_train) 
+          t = flush * 0.0f;
+        else
+          t = flush * ht[n_seq-1][0];
+      }
       concat2D(xhprev, xt[i][0], t);
       conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
       Parent::Forward(is_train, conv_nodes_in, conv_nodes_out, p_cstate);
-      lifog = mshadow::expr::reshape(conv_node_out.mat().T(), lifog.shape_);
+      lifogt = mshadow::expr::reshape(conv_node_out.data, lifogt.shape_);
+      lifog = lifogt.T();
       if (i != 0)
         t = flush * ct[i-1][0];
       else
@@ -145,6 +156,10 @@ class CLSTMLayer : public inner {
     mshadow::Tensor<xpu, 4> d_ht = node_out;
     mshadow::Tensor<xpu, 4> seq_label = nodes_in[1]->data;
 
+    CHECK(seq_label.CheckContiguous());
+    CHECK(d_ht.CheckContiguous());
+    CHECK(d_xt.CheckContiguous());
+
     index_t n_seq = seq_length / parallel_size;
     d_xt.shape_ = mshadow::Shape4(n_seq,1,parallel_size,num_hidden_in);
     d_xt.stride_ = num_hidden_in;
@@ -163,7 +178,8 @@ class CLSTMLayer : public inner {
         conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
         conv_node_out.data = mshadow::expr::reshape(d_lifog.T(), conv_node_out.data.shape_);
         Parent::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
-        d_xhprev = mshadow::expr::reshape(conv_node_in.mat().T(), d_xhprev.shape_);        
+        d_xhprevt = mshadow::expr::reshape(conv_node_in.data, d_xhprevt.shape_);
+        d_xhprev = d_xhprevt.T();        
       }else{
         flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
         t = flush * ht[i-1][0];
@@ -173,7 +189,8 @@ class CLSTMLayer : public inner {
         conv_node_in.data = mshadow::expr::reshape(xhprev, conv_node_in.data.shape_);
         conv_node_out.data = mshadow::expr::reshape(d_lifog.T(), conv_node_out.data.shape_);
         Parent::Backprop(prop_grad, conv_nodes_in, conv_nodes_out, p_cstate);
-        d_xhprev = mshadow::expr::reshape(conv_node_in.mat().T(), d_xhprev.shape_);        
+        d_xhprevt = mshadow::expr::reshape(conv_node_in.data, d_xhprevt.shape_);
+        d_xhprev = d_xhprevt.T();        
         t = d_xhprev.Slice(num_hidden_in, num_hidden_in + num_hidden_out).T();
         d_ht[i-1][0] += flush * t;
         d_cprev *= flush;
@@ -257,7 +274,7 @@ class CLSTMLayer : public inner {
 
   }
 
-  inline void initTemp(){
+  inline void InitCLSTM(){
     it.Resize(mshadow::Shape4(seq_length / parallel_size, 1, parallel_size, num_hidden_out));
     ft.Resize(mshadow::Shape4(seq_length / parallel_size, 1, parallel_size, num_hidden_out));
     ot.Resize(mshadow::Shape4(seq_length / parallel_size, 1, parallel_size, num_hidden_out));
@@ -272,7 +289,9 @@ class CLSTMLayer : public inner {
     d_cprev.Resize(mshadow::Shape2(parallel_size, num_hidden_out));
     xhprev.Resize(mshadow::Shape2(parallel_size, num_hidden_in + num_hidden_out));
     d_xhprev.Resize(mshadow::Shape2(num_hidden_in + num_hidden_out, parallel_size));
+    d_xhprevt.Resize(mshadow::Shape2(parallel_size, num_hidden_in + num_hidden_out));
     lifog.Resize(mshadow::Shape2(4 * num_hidden_out, parallel_size));
+    lifogt.Resize(mshadow::Shape2(parallel_size, 4 * num_hidden_out));
     d_lifog.Resize(mshadow::Shape2(4 * num_hidden_out, parallel_size));
   }
 
@@ -305,7 +324,9 @@ class CLSTMLayer : public inner {
   mshadow::TensorContainer<xpu, 2> flush, t;
   mshadow::TensorContainer<xpu, 2> xhprev;
   mshadow::TensorContainer<xpu, 2> d_xhprev;
+  mshadow::TensorContainer<xpu, 2> d_xhprevt;
   mshadow::TensorContainer<xpu, 2> lifog;
+  mshadow::TensorContainer<xpu, 2> lifogt;
   mshadow::TensorContainer<xpu, 2> d_lifog;
   mshadow::TensorContainer<xpu, 2> d_c;
   mshadow::TensorContainer<xpu, 2> d_cprev;
