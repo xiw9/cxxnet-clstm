@@ -20,7 +20,12 @@ class CLSTMLayer : public inner {
     conv_node_in.FreeSpace();
     conv_node_out.FreeSpace();
   }
-
+  virtual void InitModel(void) {
+    Parent::InitModel();
+    //fancy_forget_bias_init
+    Parent::bias_.Slice(Parent::param_.num_channel / 4, Parent::param_.num_channel / 2) = 3.0f;
+  }
+  
   virtual void SetParam(const char *name, const char* val) {  
     if (!strcmp(name, "parallel_size")) this->parallel_size = atoi(val);
     if (!strcmp(name, "nchannel") || !strcmp(name, "nhidden")){
@@ -53,6 +58,7 @@ class CLSTMLayer : public inner {
     d_lifog.set_stream(stream);
     d_c.set_stream(stream);
     d_cprev.set_stream(stream);
+    seq_slice.set_stream(stream);
 
     conv_node_in.data.set_stream(stream);
     conv_node_out.data.set_stream(stream);
@@ -69,8 +75,8 @@ class CLSTMLayer : public inner {
           nodes_in[0]->data.size(2), nodes_in[0]->data.size(3));      
     }
     
-    conv_node_in.must_contiguous = true;
-    conv_node_out.must_contiguous = true;
+    //conv_node_in.must_contiguous = true;
+    //conv_node_out.must_contiguous = true;
     conv_nodes_in.push_back(&conv_node_in);
     conv_nodes_out.push_back(&conv_node_out);
     Parent::InitConnection(conv_nodes_in, conv_nodes_out, p_cstate);
@@ -95,14 +101,11 @@ class CLSTMLayer : public inner {
 
   }
 
-  /*virtual void OnBatchSizeChanged(const std::vector<Node<xpu>*> &nodes_in,
+  virtual void OnBatchSizeChanged(const std::vector<Node<xpu>*> &nodes_in,
                                   const std::vector<Node<xpu>*> &nodes_out,
                                   ConnectState<xpu> *p_cstate) {
-    Parent::OnBatchSizeChanged(nodes_in, nodes_out, p_cstate);
-    this->seq_length = nodes_in[0]->data.size(0);
-    this->num_hidden_out = nodes_out[0]->data.size(1) * nodes_out[0]->data.size(2) * nodes_out[0]->data.size(3) / 4;
-    this->initTemp();
-  }*/
+    cxxnet::utils::Error("CLSTM: OnBatchSizeChanged not implemented.");
+  }
 
   virtual void Forward(bool is_train,
                        const std::vector<Node<xpu>*> &nodes_in,
@@ -110,24 +113,22 @@ class CLSTMLayer : public inner {
                        ConnectState<xpu> *p_cstate) {
     mshadow::Tensor<xpu, 4> &node_out = nodes_out[0]->data;
     mshadow::Tensor<xpu, 4> xt = nodes_in[0]->data;
-    mshadow::Tensor<xpu, 4> seq_label = nodes_in[1]->data;
+    mshadow::Tensor<xpu, 4> node_seq = nodes_in[1]->data;
     
-    CHECK(seq_label.CheckContiguous());
     CHECK(xt.CheckContiguous());
 
     index_t n_seq = seq_length / parallel_size;
     xt.shape_ = mshadow::Shape4(n_seq,1, parallel_size, num_hidden_in);
     xt.stride_ = num_hidden_in;
-    seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
-    seq_label.stride_ = parallel_size;
+    seq_slice = mshadow::expr::reshape(node_seq, seq_slice.shape_);
     
     for (index_t i = 0; i < n_seq; i++){
-      flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
+      flush = mshadow::expr::broadcast<0>(seq_slice.Slice(i * parallel_size, (i + 1) * parallel_size), flush.shape_);
       if (i != 0)
         t = flush * ht[i-1][0];
       else{
         if (is_train) 
-          t = flush * 0.0f;
+          t = 0.0f;
         else
           t = flush * ht[n_seq-1][0];
       }
@@ -138,8 +139,12 @@ class CLSTMLayer : public inner {
       lifog = lifogt.T();
       if (i != 0)
         t = flush * ct[i-1][0];
-      else
-        t = flush * ct[n_seq-1][0];
+      else{
+        if (is_train)
+          t = 0.0f;
+        else
+          t = flush * ct[n_seq-1][0];
+      }
       LSTM_Forward(lifog, t, ht[i][0], ct[i][0], it[i][0], ft[i][0], ot[i][0], gt[i][0], c_tanht[i][0]); 
     }
     node_out = mshadow::expr::reshape(ht, node_out.shape_);
@@ -154,9 +159,8 @@ class CLSTMLayer : public inner {
     mshadow::Tensor<xpu, 4> &node_out = nodes_out[0]->data;
     mshadow::Tensor<xpu, 4> d_xt = node_in;
     mshadow::Tensor<xpu, 4> d_ht = node_out;
-    mshadow::Tensor<xpu, 4> seq_label = nodes_in[1]->data;
+    mshadow::Tensor<xpu, 4> &node_seq = nodes_in[1]->data;
 
-    CHECK(seq_label.CheckContiguous());
     CHECK(d_ht.CheckContiguous());
     CHECK(d_xt.CheckContiguous());
 
@@ -165,10 +169,8 @@ class CLSTMLayer : public inner {
     d_xt.stride_ = num_hidden_in;
     d_ht.shape_ = mshadow::Shape4(n_seq,1,parallel_size,num_hidden_out);
     d_ht.stride_ = num_hidden_out;
-    seq_label.shape_ = mshadow::Shape4(n_seq, 1, 1, parallel_size);
-    seq_label.stride_ = parallel_size;
     d_cprev = 0.0f;
-    
+    seq_slice = mshadow::expr::reshape(node_seq, seq_slice.shape_);
     for (index_t i = n_seq - 1; i < n_seq; i--){ //unsigned int >=0
       mshadow::Copy(d_c, d_cprev, d_cprev.stream_);
       if (i == 0){
@@ -181,7 +183,7 @@ class CLSTMLayer : public inner {
         d_xhprevt = mshadow::expr::reshape(conv_node_in.data, d_xhprevt.shape_);
         d_xhprev = d_xhprevt.T();        
       }else{
-        flush = mshadow::expr::broadcast<0>(seq_label[i][0][0], flush.shape_);
+        flush = mshadow::expr::broadcast<0>(seq_slice.Slice(i * parallel_size, (i + 1) * parallel_size), flush.shape_);
         t = flush * ht[i-1][0];
         concat2D(xhprev, d_xt[i][0], t);
         t = flush * ct[i-1][0];
@@ -293,6 +295,7 @@ class CLSTMLayer : public inner {
     lifog.Resize(mshadow::Shape2(4 * num_hidden_out, parallel_size));
     lifogt.Resize(mshadow::Shape2(parallel_size, 4 * num_hidden_out));
     d_lifog.Resize(mshadow::Shape2(4 * num_hidden_out, parallel_size));
+    seq_slice.Resize(mshadow::Shape1(seq_length));
   }
 
   inline void tensor2To4(mshadow::Tensor<xpu, 2> a, mshadow::Tensor<xpu, 4> *a4){
@@ -330,6 +333,7 @@ class CLSTMLayer : public inner {
   mshadow::TensorContainer<xpu, 2> d_lifog;
   mshadow::TensorContainer<xpu, 2> d_c;
   mshadow::TensorContainer<xpu, 2> d_cprev;
+  mshadow::TensorContainer<xpu, 1> seq_slice;
   /*! \brief io of the embeded conv layer */
   std::vector<Node<xpu>*> conv_nodes_in, conv_nodes_out;
   Node<xpu> conv_node_in, conv_node_out;
