@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
   int new_size = -1;
   int nsplit = 1;
   int partid = 0;
+  int gray = 0;
   for (int i = 4; i < argc; ++i) {
     char key[128], val[128];
     if (sscanf(argv[i], "%[^=]=%s", key, val) == 2) {
@@ -42,6 +43,7 @@ int main(int argc, char *argv[]) {
       if (!strcmp(key, "label_width")) label_width = atoi(val);
       if (!strcmp(key, "nsplit")) nsplit = atoi(val);
       if (!strcmp(key, "part")) partid = atoi(val);
+      if (!strcmp(key, "gray")) gray = atoi(val);
     }
   }
   if (new_size > 0) {
@@ -103,7 +105,12 @@ int main(int argc, char *argv[]) {
     }
     delete fi;
     if (new_size > 0) {
-      cv::Mat img = cv::imdecode(decode_buf, CV_LOAD_IMAGE_COLOR);
+      cv::Mat img;
+      if (gray) {
+        img = cv::imdecode(decode_buf, CV_LOAD_IMAGE_GRAYSCALE);
+      } else {
+        img = cv::imdecode(decode_buf, CV_LOAD_IMAGE_COLOR);
+      }
       CHECK(img.data != NULL) << "OpenCV decode fail:" << path;
       cv::Mat res;
       if (img.rows > img.cols) {

@@ -99,6 +99,7 @@ class ImageRecordIOParser {
     dist_num_worker_ = 1;
     dist_worker_rank_ = 0;
     label_width_ = 1;
+    grayscale_ = 0;
     int maxthread;
     #pragma omp parallel
     {
@@ -163,6 +164,7 @@ class ImageRecordIOParser {
   dmlc::InputSplit *source_;
   /*! \brief label information, if any */
   ImageLabelMap *label_map_;
+  int grayscale_;
 };
 
 inline void ImageRecordIOParser::Init(void) {
@@ -210,6 +212,9 @@ SetParam(const char *name, const char *val) {
   if (!strcmp(name, "label_width")) {
     label_width_ = atoi(val);
   }
+  if (!strcmp(name, "grayscale")) {
+    grayscale_ = atoi(val);
+  }
 }
 
 inline bool ImageRecordIOParser::
@@ -233,20 +238,37 @@ ParseNext(std::vector<InstVector> *out_vec) {
       cv::Mat res;
       rec.Load(blob.dptr, blob.size);
       cv::Mat buf(1, rec.content_size, CV_8U, rec.content);
-      res = cv::imdecode(buf, 1);
-      res = augmenters_[tid]->Process(res, prnds_[tid]);
-      out.Push(static_cast<unsigned>(rec.image_index()),
-               mshadow::Shape3(3, res.rows, res.cols),
-               mshadow::Shape1(label_width_));
-      DataInst inst = out.Back();
-      for (int i = 0; i < res.rows; ++i) {
-        for (int j = 0; j < res.cols; ++j) {
-          cv::Vec3b bgr = res.at<cv::Vec3b>(i, j);
-          inst.data[0][i][j] = bgr[2];
-          inst.data[1][i][j] = bgr[1];
-          inst.data[2][i][j] = bgr[0];
-        }
+      if (!grayscale_){
+        res = cv::imdecode(buf, 1);
+        res = augmenters_[tid]->Process(res, prnds_[tid]);
+        out.Push(static_cast<unsigned>(rec.image_index()),
+                 mshadow::Shape3(3, res.rows, res.cols),
+                 mshadow::Shape1(label_width_));
+      }else{
+        res = cv::imdecode(buf, 0);
+        res = augmenters_[tid]->Process(res, prnds_[tid]);
+        out.Push(static_cast<unsigned>(rec.image_index()),
+                 mshadow::Shape3(1, res.rows, res.cols),
+                 mshadow::Shape1(label_width_));
       }
+      DataInst inst = out.Back();
+      if (!grayscale_)
+        for (int i = 0; i < res.rows; ++i) {
+          for (int j = 0; j < res.cols; ++j) {
+            cv::Vec3b bgr = res.at<cv::Vec3b>(i, j);
+            inst.data[0][i][j] = bgr[2];
+            inst.data[1][i][j] = bgr[1];
+            inst.data[2][i][j] = bgr[0];
+          }
+        }
+      else
+        for (int i = 0; i < res.rows; ++i) {
+          for (int j = 0; j < res.cols; ++j) {
+            uchar gray = res.at<uchar>(i, j);
+            inst.data[0][i][j] = gray;
+          }
+        }
+      
       if (label_map_ != NULL) {
         mshadow::Copy(inst.label, label_map_->Find(rec.image_index()));
       } else {

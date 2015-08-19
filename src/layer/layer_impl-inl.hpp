@@ -26,6 +26,7 @@
 #include "./prelu_layer-inl.hpp"
 #include "./batch_norm_layer-inl.hpp"
 #include "./clstm_layer-inl.hpp"
+#include "./reshape_layer-inl.hpp"
 #include "./loss/softmax_layer-inl.hpp"
 #include "./loss/lp_loss_layer-inl.hpp"
 #include "./loss/multi_logistic_layer-inl.hpp"
@@ -73,6 +74,7 @@ ILayer<xpu>* CreateLayer_(LayerType type,
     //case kLSTM: return new LSTMLayer<xpu>(p_rnd);
     case kLSTM: return new CLSTMLayer<xpu, FullConnectLayer<xpu> >(p_rnd);
     case kCLSTM: return new CLSTMLayer<xpu, ConvolutionLayer<xpu> >(p_rnd);
+    case kReshape: return new ReshapeLayer<xpu>();
     #if CXXNET_USE_CAFFE_ADAPTOR
     case kCaffe: return new CaffeLayer<xpu>();
     #endif

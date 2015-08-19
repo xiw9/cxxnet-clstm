@@ -23,7 +23,7 @@ class CLSTMLayer : public inner {
   virtual void InitModel(void) {
     Parent::InitModel();
     //fancy_forget_bias_init
-    Parent::bias_.Slice(Parent::param_.num_channel / 4, Parent::param_.num_channel / 2) = 3.0f;
+    Parent::bias_.Slice(Parent::param_.num_channel / 4, Parent::param_.num_channel / 2) = 1.0f;
   }
   
   virtual void SetParam(const char *name, const char* val) {  
@@ -194,8 +194,8 @@ class CLSTMLayer : public inner {
         d_xhprevt = mshadow::expr::reshape(conv_node_in.data, d_xhprevt.shape_);
         d_xhprev = d_xhprevt.T();        
         t = d_xhprev.Slice(num_hidden_in, num_hidden_in + num_hidden_out).T();
-        d_ht[i-1][0] += flush * t;
-        d_cprev *= flush;
+        d_ht[i-1][0] = d_ht[i-1][0] + flush * t;
+        d_cprev = d_cprev * flush;
       }
       if (prop_grad) {
         d_xt[i][0] = d_xhprev.Slice(0, num_hidden_in).T();
@@ -259,7 +259,7 @@ class CLSTMLayer : public inner {
     using namespace cxxnet::op;
     using namespace mshadow::expr;
     
-    d_c += F<tanh_grad>(c_tanh) * o * d_h;
+    d_c = d_c + F<tanh_grad>(c_tanh) * o * d_h;
     d_cprev = f * d_c;
     
     mshadow::Tensor<xpu, 2> d_li, d_lf, d_lo, d_lg;

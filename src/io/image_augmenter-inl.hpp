@@ -30,6 +30,7 @@ class ImageAugmenter {
     min_img_size_ = 0.0f;
     max_img_size_ = 1e10f;
     fill_value_ = 255;
+    grayscale_ = 0;
   }
   virtual ~ImageAugmenter() {
   }
@@ -62,6 +63,7 @@ class ImageAugmenter {
         rotate_list_.push_back(atoi(buf));
       }
     }
+    if (!strcmp(name, "grayscale")) grayscale_ = atoi(val);
   }
   /*!
    * \brief augment src image, store result into dst
@@ -151,6 +153,7 @@ class ImageAugmenter {
   virtual mshadow::Tensor<cpu, 3> Process(mshadow::Tensor<cpu, 3> data,
                                           utils::RandomSampler *prnd) {
     if (!NeedProcess()) return data;
+if (!grayscale_) {
     cv::Mat res(data.size(1), data.size(2), CV_8UC3);
     for (index_t i = 0; i < data.size(1); ++i) {
       for (index_t j = 0; j < data.size(2); ++j) {
@@ -170,6 +173,23 @@ class ImageAugmenter {
       }
     }
     return tmpres;
+} else {
+    cv::Mat res(data.size(1), data.size(2), CV_8UC1);
+    for (index_t i = 0; i < data.size(1); ++i) {
+      for (index_t j = 0; j < data.size(2); ++j) {
+        res.at<uchar>(i, j) = data[0][i][j];
+      }
+    }
+    res = this->Process(res, prnd);
+    tmpres.Resize(mshadow::Shape3(1, res.rows, res.cols));
+    for (index_t i = 0; i < tmpres.size(1); ++i) {
+      for (index_t j = 0; j < tmpres.size(2); ++j) {
+        uchar bgr = res.at<uchar>(i, j);
+        tmpres[0][i][j] = bgr;
+      }
+    }
+    return tmpres;
+}
   }
 
   virtual void Process(unsigned char *dptr, size_t sz,
@@ -240,6 +260,7 @@ class ImageAugmenter {
   int fill_value_;
   /*! \brief list of possible rotate angle */
   std::vector<int> rotate_list_;
+  int grayscale_;
 };
 }  // namespace cxxnet
 #endif
