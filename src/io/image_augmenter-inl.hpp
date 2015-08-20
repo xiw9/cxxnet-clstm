@@ -170,45 +170,45 @@ class ImageAugmenter {
   virtual mshadow::Tensor<cpu, 3> Process(mshadow::Tensor<cpu, 3> data,
                                           utils::RandomSampler *prnd) {
     if (!NeedProcess()) return data;
-if (!grayscale_) {
-    cv::Mat res(data.size(1), data.size(2), CV_8UC3);
-    for (index_t i = 0; i < data.size(1); ++i) {
-      for (index_t j = 0; j < data.size(2); ++j) {
-        res.at<cv::Vec3b>(i, j)[0] = data[2][i][j];
-        res.at<cv::Vec3b>(i, j)[1] = data[1][i][j];
-        res.at<cv::Vec3b>(i, j)[2] = data[0][i][j];
+    if (!grayscale_) {
+      cv::Mat res(data.size(1), data.size(2), CV_8UC3);
+      for (index_t i = 0; i < data.size(1); ++i) {
+        for (index_t j = 0; j < data.size(2); ++j) {
+          res.at<cv::Vec3b>(i, j)[0] = data[2][i][j];
+          res.at<cv::Vec3b>(i, j)[1] = data[1][i][j];
+          res.at<cv::Vec3b>(i, j)[2] = data[0][i][j];
+        }
       }
-    }
-    res = this->Process(res, prnd);
-    tmpres.Resize(mshadow::Shape3(3, res.rows, res.cols));
-    for (index_t i = 0; i < tmpres.size(1); ++i) {
-      for (index_t j = 0; j < tmpres.size(2); ++j) {
-        cv::Vec3b bgr = res.at<cv::Vec3b>(i, j);
-        tmpres[0][i][j] = bgr[2];
-        tmpres[1][i][j] = bgr[1];
-        tmpres[2][i][j] = bgr[0];
+      res = this->Process(res, prnd);
+      tmpres.Resize(mshadow::Shape3(3, res.rows, res.cols));
+      for (index_t i = 0; i < tmpres.size(1); ++i) {
+        for (index_t j = 0; j < tmpres.size(2); ++j) {
+          cv::Vec3b bgr = res.at<cv::Vec3b>(i, j);
+          tmpres[0][i][j] = bgr[2];
+          tmpres[1][i][j] = bgr[1];
+          tmpres[2][i][j] = bgr[0];
+        }
       }
-    }
-    return tmpres;
-} else {
-    cv::Mat res(data.size(1), data.size(2), CV_8UC1);
-    for (index_t i = 0; i < data.size(1); ++i) {
-      for (index_t j = 0; j < data.size(2); ++j) {
-        res.at<uchar>(i, j) = data[0][i][j];
+      return tmpres;
+    } else {
+      cv::Mat res(data.size(1), data.size(2), CV_8UC1);
+      for (index_t i = 0; i < data.size(1); ++i) {
+        for (index_t j = 0; j < data.size(2); ++j) {
+          res.at<uchar>(i, j) = data[0][i][j];
+        }
       }
-    }
-    res = this->Process(res, prnd);
-    tmpres.Resize(mshadow::Shape3(1, res.rows, res.cols));
-    for (index_t i = 0; i < tmpres.size(1); ++i) {
-      for (index_t j = 0; j < tmpres.size(2); ++j) {
-        uchar bgr = res.at<uchar>(i, j);
-        tmpres[0][i][j] = bgr;
+      res = this->Process(res, prnd);
+      tmpres.Resize(mshadow::Shape3(1, res.rows, res.cols));
+      for (index_t i = 0; i < tmpres.size(1); ++i) {
+        for (index_t j = 0; j < tmpres.size(2); ++j) {
+          uchar bgr = res.at<uchar>(i, j);
+          tmpres[0][i][j] = bgr;
+        }
       }
+      return tmpres;
     }
-    return tmpres;
-}
   }
-
+  
   virtual void Process(unsigned char *dptr, size_t sz,
                        mshadow::TensorContainer<cpu, 3> *p_data,
                        utils::RandomSampler *prnd) {
