@@ -31,6 +31,8 @@ class ImageAugmenter {
     max_img_size_ = 1e10f;
     fill_value_ = 255;
     grayscale_ = 0;
+    sequence_size_ = 1;
+    sequence_loc_ = 0;
   }
   virtual ~ImageAugmenter() {
   }
@@ -64,6 +66,7 @@ class ImageAugmenter {
       }
     }
     if (!strcmp(name, "grayscale")) grayscale_ = atoi(val);
+    if (!strcmp(name, "sequence")) sequence_size_ = atoi(val);
   }
   /*!
    * \brief augment src image, store result into dst
@@ -116,23 +119,36 @@ class ImageAugmenter {
       mshadow::index_t y = res.rows - rand_crop_size;
       mshadow::index_t x = res.cols - rand_crop_size;
       if (rand_crop_ != 0) {
-        y = prnd->NextUInt32(y + 1);
-        x = prnd->NextUInt32(x + 1);
+        if (sequence_loc_ == 0){
+          y = prnd->NextUInt32(y + 1);
+          x = prnd->NextUInt32(x + 1);
+          seq_y = y;
+          seq_x = x;
+        } else {
+          y = seq_y;
+          x = seq_x;
+        }
       }
       else {
         y /= 2; x /= 2;
       }
       cv::Rect roi(x, y, rand_crop_size, rand_crop_size);
       cv::resize(res(roi), res, cv::Size(shape_[1], shape_[2]));
-    }
-    else{
+    }else{
       utils::Check(static_cast<mshadow::index_t>(res.cols) >= shape_[1] && static_cast<mshadow::index_t>(res.rows) >= shape_[2],
-        "input image size smaller than input shape");
+                   "input image size smaller than input shape");
       mshadow::index_t y = res.rows - shape_[2];
       mshadow::index_t x = res.cols - shape_[1];
       if (rand_crop_ != 0) {
-        y = prnd->NextUInt32(y + 1);
-        x = prnd->NextUInt32(x + 1);
+        if (sequence_loc_ == 0){
+          y = prnd->NextUInt32(y + 1);
+          x = prnd->NextUInt32(x + 1);
+          seq_y = y;
+          seq_x = x;
+        } else {
+          y = seq_y;
+          x = seq_x;
+        }
       }
       else {
         y /= 2; x /= 2;
@@ -140,6 +156,7 @@ class ImageAugmenter {
       cv::Rect roi(x, y, shape_[1], shape_[2]);
       res = res(roi);
     }
+    sequence_loc_ = (sequence_loc_ + 1) % sequence_size_;
     return res;
   }
   /*!
@@ -261,6 +278,9 @@ if (!grayscale_) {
   /*! \brief list of possible rotate angle */
   std::vector<int> rotate_list_;
   int grayscale_;
+  int sequence_loc_;
+  int sequence_size_;
+  mshadow::index_t seq_x, seq_y;
 };
 }  // namespace cxxnet
 #endif

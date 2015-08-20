@@ -91,7 +91,7 @@ class ImageLabelMap {
 // parser to parse image recordio
 class ImageRecordIOParser {
  public:
-  ImageRecordIOParser(int nthread = 4)
+  ImageRecordIOParser(int nthread = 1)
       : nthread_(nthread),
         source_(NULL),
         label_map_(NULL) {
