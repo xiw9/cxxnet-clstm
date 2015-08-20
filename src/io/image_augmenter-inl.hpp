@@ -115,7 +115,13 @@ class ImageAugmenter {
     if (max_crop_size_ != -1 || min_crop_size_ != -1){
       utils::Check(res.cols >= max_crop_size_ && res.rows >= max_crop_size_&&max_crop_size_ >= min_crop_size_,
         "input image size smaller than max_crop_size");
-      mshadow::index_t rand_crop_size = prnd->NextUInt32(max_crop_size_-min_crop_size_+1)+min_crop_size_;
+      mshadow::index_t rand_crop_size;
+      if (sequence_loc_ == 0){
+        rand_crop_size = prnd->NextUInt32(max_crop_size_-min_crop_size_+1)+min_crop_size_;
+        seq_crop = rand_crop_size;
+      } else {
+        rand_crop_size = seq_crop;
+      }
       mshadow::index_t y = res.rows - rand_crop_size;
       mshadow::index_t x = res.cols - rand_crop_size;
       if (rand_crop_ != 0) {
@@ -280,7 +286,7 @@ class ImageAugmenter {
   int grayscale_;
   int sequence_loc_;
   int sequence_size_;
-  mshadow::index_t seq_x, seq_y;
+  mshadow::index_t seq_x, seq_y, seq_crop;
 };
 }  // namespace cxxnet
 #endif
