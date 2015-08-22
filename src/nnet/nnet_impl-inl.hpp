@@ -480,7 +480,7 @@ class CXXNetThreadTrainer : public INetTrainer {
   std::string model_blob_;
   /*! \brief threads of neural nets */
   std::vector<NeuralNetThread<xpu>*> nets_;
-
+public:
   /*! \brief network configuration type */
   NetConfig net_cfg;
   /*! \brief history of configurations */
