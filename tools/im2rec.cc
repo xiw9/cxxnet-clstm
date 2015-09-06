@@ -28,7 +28,8 @@ int main(int argc, char *argv[]) {
            "\tresize=newsize resize the shorter edge of image to the newsize, original images will be packed by default\n"\
            "\tlabel_width=WIDTH[default=1] specify the label_width in the list, by default set to 1\n"\
            "\tnsplit=NSPLIT[default=1] used for part generation, logically split the image.list to NSPLIT parts by position\n"\
-           "\tpart=PART[default=0] used for part generation, pack the images from the specific part in image.list\n");
+           "\tpart=PART[default=0] used for part generation, pack the images from the specific part in image.list\n"\
+	   "\tgray=GRAY[default=0] grayscale images.\n");
     return 0;
   }
   int label_width = 1;

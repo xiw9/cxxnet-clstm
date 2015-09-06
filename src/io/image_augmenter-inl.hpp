@@ -115,19 +115,43 @@ class ImageAugmenter {
     if (max_crop_size_ != -1 || min_crop_size_ != -1){
       utils::Check(res.cols >= max_crop_size_ && res.rows >= max_crop_size_&&max_crop_size_ >= min_crop_size_,
         "input image size smaller than max_crop_size");
-      mshadow::index_t rand_crop_size;
+      //mshadow::index_t rand_crop_size;
       if (sequence_loc_ == 0){
-        rand_crop_size = prnd->NextUInt32(max_crop_size_-min_crop_size_+1)+min_crop_size_;
-        seq_crop = rand_crop_size;
-      } else {
-        rand_crop_size = seq_crop;
-      }
-      mshadow::index_t y = res.rows - rand_crop_size;
-      mshadow::index_t x = res.cols - rand_crop_size;
+        index_t crop_size = prnd->NextUInt32(4);
+        switch (crop_size) {
+          case 0: seq_cropx = 168; break;
+          case 1: seq_cropx = 192; break;
+          case 2: seq_cropx = 256; break;
+          default: seq_cropx = 224;
+        }
+        crop_size = prnd->NextUInt32(4);
+        switch (crop_size) {
+          case 0: seq_cropy = 168; break;
+          case 1: seq_cropy = 192; break;
+          case 2: seq_cropy = 256; break;
+          default: seq_cropy = 224;
+        }
+        //rand_crop_size = prnd->NextUInt32(max_crop_size_-min_crop_size_+1)+min_crop_size_;
+        //seq_crop = rand_crop_size;
+      } //else {
+        //rand_crop_size = seq_crop;
+        //}
+      //mshadow::index_t y = res.rows - rand_crop_size;
+      //mshadow::index_t x = res.cols - rand_crop_size;
+      mshadow::index_t y = res.rows - seq_cropy;
+      mshadow::index_t x = res.cols - seq_cropx;
       if (rand_crop_ != 0) {
         if (sequence_loc_ == 0){
-          y = prnd->NextUInt32(y + 1);
-          x = prnd->NextUInt32(x + 1);
+          index_t pos = prnd->NextUInt32(5);
+          if (pos / 2 < 1 && pos < 4)
+            x = 0;
+          if (pos % 2 < 1 && pos < 4)
+            y = 0;
+          if (pos >= 4) {
+            y /= 2; x /= 2;
+          }
+          //y = prnd->NextUInt32(y + 1);
+          //x = prnd->NextUInt32(x + 1);
           seq_y = y;
           seq_x = x;
         } else {
@@ -138,7 +162,8 @@ class ImageAugmenter {
       else {
         y /= 2; x /= 2;
       }
-      cv::Rect roi(x, y, rand_crop_size, rand_crop_size);
+      //cv::Rect roi(x, y, rand_crop_size, rand_crop_size);
+      cv::Rect roi(x, y, seq_cropx, seq_cropy);
       cv::resize(res(roi), res, cv::Size(shape_[1], shape_[2]));
     }else{
       utils::Check(static_cast<mshadow::index_t>(res.cols) >= shape_[1] && static_cast<mshadow::index_t>(res.rows) >= shape_[2],
@@ -147,8 +172,16 @@ class ImageAugmenter {
       mshadow::index_t x = res.cols - shape_[1];
       if (rand_crop_ != 0) {
         if (sequence_loc_ == 0){
-          y = prnd->NextUInt32(y + 1);
-          x = prnd->NextUInt32(x + 1);
+          index_t pos = prnd->NextUInt32(5);
+          if (pos / 2 < 1 && pos < 4)
+            x = 0;
+          if (pos % 2 < 1 && pos < 4)
+            y = 0;
+          if (pos >= 4) {
+            y /= 2; x /= 2;
+          }
+          //y = prnd->NextUInt32(y + 1);
+          //x = prnd->NextUInt32(x + 1);
           seq_y = y;
           seq_x = x;
         } else {
@@ -286,7 +319,7 @@ class ImageAugmenter {
   int grayscale_;
   int sequence_loc_;
   int sequence_size_;
-  mshadow::index_t seq_x, seq_y, seq_crop;
+  mshadow::index_t seq_x, seq_y, seq_cropx, seq_cropy;
 };
 }  // namespace cxxnet
 #endif
