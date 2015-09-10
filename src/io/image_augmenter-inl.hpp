@@ -33,6 +33,7 @@ class ImageAugmenter {
     grayscale_ = 0;
     sequence_size_ = 1;
     sequence_loc_ = 0;
+    rand_mirror_ = 0;
   }
   virtual ~ImageAugmenter() {
   }
@@ -67,6 +68,7 @@ class ImageAugmenter {
     }
     if (!strcmp(name, "grayscale")) grayscale_ = atoi(val);
     if (!strcmp(name, "sequence")) sequence_size_ = atoi(val);
+    if (!strcmp(name, "rand_mirror")) rand_mirror_ = atoi(val);
   }
   /*!
    * \brief augment src image, store result into dst
@@ -195,8 +197,19 @@ class ImageAugmenter {
       cv::Rect roi(x, y, shape_[1], shape_[2]);
       res = res(roi);
     }
+
+    cv::Mat dst = res;
+    if (rand_mirror_ != 0) {
+      if (sequence_loc_ == 0){
+        index_t mirror = prnd->NextUInt32(1);
+        seq_mirror = mirror;
+      }
+      if (seq_mirror)
+        cv::flip(res,dst,0);
+    }
+    
     sequence_loc_ = (sequence_loc_ + 1) % sequence_size_;
-    return res;
+    return dst;
   }
   /*!
    * \brief augment src image, store result into dst
@@ -319,7 +332,8 @@ class ImageAugmenter {
   int grayscale_;
   int sequence_loc_;
   int sequence_size_;
-  mshadow::index_t seq_x, seq_y, seq_cropx, seq_cropy;
+  int rand_mirror_;
+  mshadow::index_t seq_x, seq_y, seq_cropx, seq_cropy, seq_mirror;
 };
 }  // namespace cxxnet
 #endif

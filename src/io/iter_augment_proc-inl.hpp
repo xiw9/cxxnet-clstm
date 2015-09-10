@@ -59,7 +59,7 @@ public:
     if (!strcmp(name, "image_mean")) name_meanimg_ = val;
     if (!strcmp(name, "crop_y_start")) crop_y_start_ = atoi(val);
     if (!strcmp(name, "crop_x_start")) crop_x_start_ = atoi(val);
-    if (!strcmp(name, "rand_mirror")) rand_mirror_ = atoi(val);
+    //    if (!strcmp(name, "rand_mirror")) rand_mirror_ = atoi(val);
     if (!strcmp(name, "mirror")) mirror_ = atoi(val);
     if (!strcmp(name, "max_random_contrast")) max_random_contrast_ = atof(val);
     if (!strcmp(name, "max_random_illumination")) max_random_illumination_ = atof(val);
