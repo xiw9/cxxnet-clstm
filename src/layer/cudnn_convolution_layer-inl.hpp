@@ -85,26 +85,28 @@ class CuDNNConvolutionLayer<gpu> : public ConvolutionLayer<gpu> {
                                             out.shape_[2], out.shape_[3]) == CUDNN_STATUS_SUCCESS, "cudnn failed");
       utils::Check(cudnnSetTensor4dDescriptor(bias_desc_, CUDNN_TENSOR_NCHW, dtype_,
                                             1, Parent::bias_.shape_[0], 1, 1) == CUDNN_STATUS_SUCCESS, "cudnn failed");
-      // cudnn v3
-      utils::Check(cudnnGetConvolutionForwardAlgorithm(handle_,
-                                                       in_desc_,
-                                                       filter_desc_,
-                                                       conv_desc_,
-                                                       out_desc_,
-                                                       CUDNN_CONVOLUTION_FWD_PREFER_FASTEST,
-                                                       512<<20,
-                                                       &algo_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
 
-      utils::Check(cudnnGetConvolutionBackwardFilterAlgorithm(handle_,
-                                                              in_desc_,
-                                                              out_desc_,
-                                                              conv_desc_,
-                                                              filter_desc_,
-                                                              CUDNN_CONVOLUTION_BWD_FILTER_PREFER_FASTEST,
-                                                              512<<20,
-                                                              &back_algo_w_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
-
-      utils::Check(cudnnGetConvolutionBackwardDataAlgorithm(handle_,
+      if (use_fast_algo_){
+        // cudnn v3
+        utils::Check(cudnnGetConvolutionForwardAlgorithm(handle_,
+                                                         in_desc_,
+                                                         filter_desc_,
+                                                         conv_desc_,
+                                                         out_desc_,
+                                                         CUDNN_CONVOLUTION_FWD_PREFER_FASTEST,
+                                                         512<<20,
+                                                         &algo_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
+        
+        utils::Check(cudnnGetConvolutionBackwardFilterAlgorithm(handle_,
+                                                                in_desc_,
+                                                                out_desc_,
+                                                                conv_desc_,
+                                                                filter_desc_,
+                                                                CUDNN_CONVOLUTION_BWD_FILTER_PREFER_FASTEST,
+                                                                512<<20,
+                                                                &back_algo_w_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
+        
+        utils::Check(cudnnGetConvolutionBackwardDataAlgorithm(handle_,
                                                               filter_desc_,
                                                               out_desc_,
                                                               conv_desc_,
@@ -112,6 +114,34 @@ class CuDNNConvolutionLayer<gpu> : public ConvolutionLayer<gpu> {
                                                               CUDNN_CONVOLUTION_BWD_DATA_PREFER_FASTEST,
                                                               512<<20,
                                                               &back_algo_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
+      } else {
+        utils::Check(cudnnGetConvolutionForwardAlgorithm(handle_,
+                                                         in_desc_,
+                                                         filter_desc_,
+                                                         conv_desc_,
+                                                         out_desc_,
+                                                         CUDNN_CONVOLUTION_FWD_NO_WORKSPACE,
+                                                         0,
+                                                         &algo_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
+
+        utils::Check(cudnnGetConvolutionBackwardFilterAlgorithm(handle_,
+                                                                in_desc_,
+                                                                out_desc_,
+                                                                conv_desc_,
+                                                                filter_desc_,
+                                                                CUDNN_CONVOLUTION_BWD_FILTER_NO_WORKSPACE,
+                                                                0,
+                                                                &back_algo_w_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
+
+        utils::Check(cudnnGetConvolutionBackwardDataAlgorithm(handle_,
+                                                              filter_desc_,
+                                                              out_desc_,
+                                                              conv_desc_,
+                                                              in_desc_,
+                                                              CUDNN_CONVOLUTION_BWD_DATA_NO_WORKSPACE,
+                                                              0,
+                                                              &back_algo_) == CUDNN_STATUS_SUCCESS, "cudnn fail");
+      }
       size_t back_size = 0;
       size_t back_size_w = 0;
       utils::Check(cudnnGetConvolutionBackwardDataWorkspaceSize(handle_,
