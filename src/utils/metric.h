@@ -116,7 +116,7 @@ struct MetricContrast : public MetricBase{
     float diff = 0.0f, dist = 0.0f;
     int k = predscore.size(0) / 2;
     for (index_t i = 0; i < predscore.size(0) / 2; ++i) {
-      dist = (predscore[i] - predscore[i + k]) * (predscore[i] - predscore[i + k]);
+      dist += (predscore[i] - predscore[i + k]) * (predscore[i] - predscore[i + k]);
     }
     if (label[0] > 0.5)
       diff += dist;
