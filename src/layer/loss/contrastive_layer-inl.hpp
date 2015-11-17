@@ -35,7 +35,7 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
     CHECK(lb.size(0) == inout_data.size(0) && lb.size(1) == 1)
       << "ContrastiveLayer: label size mismatch";
     for (index_t i = 1; i < inout_data.size(0) ; i += 2) {
-      if (lb[i][0] > 0.5){ //postive pair
+      if (lb[i][0] > 0.5f){ //postive pair
 	for (int j = 0; j < p; ++j){
 	  inout_data[i][j] = 2 * (inout_data[i][j] - inout_data[i][j + p]);
 	  inout_data[i][j + p] = -1.0f * inout_data[i][j];

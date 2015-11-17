@@ -31,8 +31,8 @@ class ReshapeLayer : public ILayer<xpu> {
     mshadow::Tensor<xpu, 4> &node_in = nodes_in[0]->data;
     mshadow::Tensor<xpu, 4> &node_out = nodes_out[0]->data;
     for (index_t i = 0; i < node_out.shape_[0]; i++) {
-      node_out[i][0] = node_in[(i / 2) * 2][0];
-      node_out[i][1] = node_in[(i / 2) * 2 + 1][0];
+      node_out[i][0] = reshape(node_in[(i / 2) * 2][0], node_out[i][0].shape_);
+      node_out[i][1] = reshape(node_in[(i / 2) * 2 + 1][0], node_out[i][1].shape_);
     }
   }
   virtual void Backprop(bool prop_grad,
@@ -44,7 +44,7 @@ class ReshapeLayer : public ILayer<xpu> {
     mshadow::Tensor<xpu, 4> &node_out = nodes_out[0]->data;
     if (prop_grad) {
        for (index_t i = 0; i < nodes_in[0]->data.shape_[0]; i++) {
-         node_in[i][0] = node_out[i][i % 2];
+         node_in[i][0] = reshape(node_out[i][i % 2],node_out[i][0].shape_);
        }
     }    
   }

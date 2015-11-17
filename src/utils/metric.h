@@ -112,15 +112,15 @@ struct MetricContrast : public MetricBase{
                            const mshadow::Tensor<cpu,1> &label) {
     utils::Check(1 == label.size(0),
                  "Metric: In Contrast metric, the size of label must be 1.");
-    float diff = 0, dist;
+    float diff = 0.0f, dist = 0.0f;
     int k = predscore.size(0) / 2;
     for (index_t i = 0; i < predscore.size(0) / 2; ++i) {
       dist = (predscore[i] - predscore[i + k]) * (predscore[i] - predscore[i + k]);
-      if (label[i] > 0.5)
-	diff += dist;
-      else
-	diff += std::max(0.0f, 0.2f - dist);
     }
+    if (label[0] > 0.5)
+      diff += dist;
+    else
+      diff += std::max(0.0f, 0.2f - dist);
     return diff;
   }
 };
