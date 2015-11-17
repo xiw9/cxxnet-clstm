@@ -104,7 +104,8 @@ struct MetricRMSE : public MetricBase{
  /*! \brief Contrast */
 struct MetricContrast : public MetricBase{
  public:
-  MetricContrast(void) : MetricBase("contrast") {
+  MetricContrast(const char *name) : MetricBase("cont") {
+    CHECK(sscanf(name, "cont@%f", &m) == 1) << "must specify m for cont@m";    
   }
   virtual ~MetricContrast(void) {}
  protected:
@@ -120,11 +121,33 @@ struct MetricContrast : public MetricBase{
     if (label[0] > 0.5)
       diff += dist;
     else
-      diff += std::max(0.0f, 0.2f - dist);
+      diff += std::max(0.0f, m * m - dist);
     return diff;
   }
+  float m;
 };
 
+ /*! \brief Contrast */
+ struct MetricContrastDist : public MetricBase{
+ public:
+ MetricContrastDist(void) : MetricBase("dist") {
+   }
+   virtual ~MetricContrastDist(void) {}
+ protected:
+   virtual float CalcMetric(const mshadow::Tensor<cpu,1> &predscore,
+			    const mshadow::Tensor<cpu,1> &label) {
+     utils::Check(1 == label.size(0),
+		  "Metric: In Contrast metric, the size of label must be 1.");
+     float diff = 0.0f;
+     int k = predscore.size(0) / 2;
+     for (index_t i = 0; i < predscore.size(0) / 2; ++i) {
+       diff += (predscore[i] - predscore[i + k]) * (predscore[i] - predscore[i + k]);
+     }
+     return diff;
+   }
+ };
+ 
+ 
 /*! \brief Error */
 struct MetricError : public MetricBase{
  public:
@@ -243,7 +266,8 @@ struct MetricSet{
     if (!strcmp(name, "error")) return new MetricError();
     if (!strcmp(name, "logloss")) return new MetricLogloss();
     if (!strncmp(name, "rec@",4)) return new MetricRecall(name);
-    if (!strcmp(name, "contrast")) return new MetricContrast();
+    if (!strncmp(name, "cont@",5)) return new MetricContrast(name);
+    if (!strcmp(name, "dist")) return new MetricContrastDist();
     return NULL;
   }
   void AddMetric(const char *name, const char* field) {

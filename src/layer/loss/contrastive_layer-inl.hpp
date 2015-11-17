@@ -15,12 +15,12 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
   ContrastiveLossLayer(const LabelInfo *label_info)
       : LossLayerBase<xpu>(label_info) {
     p = 1024;
-    m = 0.4472;
+    m = 0.5477f;
   }
   virtual ~ContrastiveLossLayer(void) {
   }
   virtual void SetParam(const char *name, const char *val) {
-    if (!strcmp(name, "p")) p = atoi(val);
+    if (!strcmp(name, "width")) p = atoi(val);
     if (!strcmp(name, "m")) m = atof(val);
     LossLayerBase<xpu>::SetParam(name, val);
   }
@@ -37,13 +37,16 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
     for (index_t i = 1; i < inout_data.size(0) ; i += 2) {
       if (lb[i][0] > 0.5f){ //postive pair
 	for (int j = 0; j < p; ++j){
-	  inout_data[i][j] = 2 * (inout_data[i][j] - inout_data[i][j + p]);
+	  inout_data[i][j] = 2.0f * (inout_data[i][j] - inout_data[i][j + p]);
 	  inout_data[i][j + p] = -1.0f * inout_data[i][j];
 	} 
       }else{ //neg
+        float d = 0.0f;
+        for (int j = 0; j < p; ++j)
+          d += (inout_data[i][j] - inout_data[i][j + p]) * (inout_data[i][j] - inout_data[i][j + p]);
 	for (int j = 0; j < p; ++j){
-	  if (std::abs(inout_data[i][j] - inout_data[i][j + p]) < m) {
-	    inout_data[i][j] = - 2 * (inout_data[i][j] - inout_data[i][j + p]); 
+	  if (d < m * m) {
+	    inout_data[i][j] = -2.0f * (inout_data[i][j] - inout_data[i][j + p]); 
 	  } else {
 	    inout_data[i][j] = 0;
 	  }
