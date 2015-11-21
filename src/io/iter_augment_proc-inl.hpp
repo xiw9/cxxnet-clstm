@@ -38,6 +38,8 @@ public:
     mean_g_ = 0.0f;
     mean_b_ = 0.0f;
     mirror_ = 0;
+    views_ = 0;
+    views_current_ = 0;
     max_random_illumination_ = 0.0f;
     max_random_contrast_ = 0.0f;
     rnd.Seed(kRandMagic);
@@ -63,6 +65,7 @@ public:
     if (!strcmp(name, "mirror")) mirror_ = atoi(val);
     if (!strcmp(name, "max_random_contrast")) max_random_contrast_ = atof(val);
     if (!strcmp(name, "max_random_illumination")) max_random_illumination_ = atof(val);
+    if (!strcmp(name, "views")) views_ = atof(val);
     if (!strcmp(name, "mean_value")) {
       utils::Check(sscanf(val, "%f,%f,%f", &mean_b_, &mean_g_, &mean_r_) == 3,
                    "mean value must be three consecutive float without space example: 128,127.5,128.2 ");
@@ -105,7 +108,7 @@ private:
     out_.index = d.index;
     mshadow::Tensor<cpu, 3> data = d.data;
 #if CXXNET_USE_OPENCV
-    if (!no_aug_) data = aug.Process(data, &rnd);
+    if (!no_aug_ && !views_ && rand_crop_) data = aug.Process(data, &rnd);
 #endif
 
     img_.Resize(mshadow::Shape3(data.shape_[0], shape_[1], shape_[2]));
@@ -116,7 +119,16 @@ private:
           << "Data size must be bigger than the input size to net.";
       mshadow::index_t yy = data.size(1) - shape_[1];
       mshadow::index_t xx = data.size(2) - shape_[2];
-      if (rand_crop_ != 0 && (yy != 0 || xx != 0)) {
+      if (views_ > 0 ){
+        if (views_current_ % 5 == 4){
+          yy /= 2;
+          xx /= 2;
+        } else {
+          yy *= (views_current_ % 5) % 2;
+          xx *= (views_current_ % 5) / 2;
+        }
+        mirror_ = views_current_ / 5;
+      } else if (rand_crop_ != 0 && (yy != 0 || xx != 0)) {
         yy = rnd.NextUInt32(yy + 1);
         xx = rnd.NextUInt32(xx + 1);
       } else {
@@ -164,9 +176,17 @@ private:
     }
     out_.data = img_;
   }
+  
   inline bool Next_(void) {
     if (!base_->Next()) {
-      return false;
+      views_current_ ++;
+      if (views_ == 0 || (views_ == 1 && views_current_ >= 10))
+        return false;
+      else {
+        base_->BeforeFirst();
+        if (!base_->Next())
+          return false;
+      }
     }
     const DataInst &d = base_->Value();
     this->SetData(d);
@@ -251,6 +271,7 @@ private:
   utils::RandomSampler rnd;
   // random magic number of this iterator
   static const int kRandMagic = 0;
+  int views_, views_current_;
 };  // class AugmentIterator
 }  // namespace cxxnet
 #endif

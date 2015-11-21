@@ -16,12 +16,14 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
       : LossLayerBase<xpu>(label_info) {
     p = 1024;
     m = 0.5477f;
+    k = 1.0f;
   }
   virtual ~ContrastiveLossLayer(void) {
   }
   virtual void SetParam(const char *name, const char *val) {
     if (!strcmp(name, "width")) p = atoi(val);
     if (!strcmp(name, "m")) m = atof(val);
+    if (!strcmp(name, "k")) k = atof(val);
     LossLayerBase<xpu>::SetParam(name, val);
   }
  protected:
@@ -34,19 +36,20 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
     mshadow::Tensor<cpu, 2> lb = label.label;
     CHECK(lb.size(0) == inout_data.size(0) && lb.size(1) == 1)
       << "ContrastiveLayer: label size mismatch";
+    #pragma omp parallel for
     for (index_t i = 1; i < inout_data.size(0) ; i += 2) {
       if (lb[i][0] > 0.5f){ //postive pair
 	for (int j = 0; j < p; ++j){
 	  inout_data[i][j] = 2.0f * (inout_data[i][j] - inout_data[i][j + p]);
 	  inout_data[i][j + p] = -1.0f * inout_data[i][j];
-	} 
+	}
       }else{ //neg
         float d = 0.0f;
         for (int j = 0; j < p; ++j)
           d += (inout_data[i][j] - inout_data[i][j + p]) * (inout_data[i][j] - inout_data[i][j + p]);
 	for (int j = 0; j < p; ++j){
 	  if (d < m * m) {
-	    inout_data[i][j] = -2.0f * (inout_data[i][j] - inout_data[i][j + p]); 
+	    inout_data[i][j] = -2.0f * (inout_data[i][j] - inout_data[i][j + p]);
 	  } else {
 	    inout_data[i][j] = 0;
 	  }
@@ -54,15 +57,15 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
 	}
       }
       for (index_t j = 0; j < inout_data.size(1); ++j){
-	inout_data[i - 1][j] = inout_data[i][j] / 2.0f;
-	inout_data[i][j] = inout_data[i][j] / 2.0f;
+	inout_data[i - 1][j] = inout_data[i][j] / 2.0f * k;
+	inout_data[i][j] = inout_data[i][j] / 2.0f * k;
       }
     }
   }
  private:
   // feature width
   int p;
-  float m;
+  float m, k;
 };
 }  // namespace layer
 }  // namespace cxxnet

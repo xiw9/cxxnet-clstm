@@ -13,8 +13,16 @@ template<typename xpu>
 class SoftmaxLayer: public LossLayerBase<xpu> {
  public:
   SoftmaxLayer(const LabelInfo *label_info)
-      : LossLayerBase<xpu>(label_info) {}
+      : LossLayerBase<xpu>(label_info) {
+     skipzero = 0;
+     kk = 1.0f;
+  }
   virtual ~SoftmaxLayer(void) {
+  }
+  virtual void SetParam(const char *name, const char *val) {
+    if (!strcmp(name, "skipzero")) skipzero = atoi(val);
+    if (!strcmp(name, "k")) kk = atof(val);
+    LossLayerBase<xpu>::SetParam(name, val);
   }
  protected:
   virtual void Forward_(mshadow::Tensor<xpu, 2> inout_data,
@@ -29,8 +37,13 @@ class SoftmaxLayer: public LossLayerBase<xpu> {
     for (mshadow::index_t i = 0; i < inout_data.size(0); ++i) {
       index_t k = static_cast<index_t>(lb[i][0]);
       inout_data[i][k] -= 1.0f;
+      inout_data[i] *= kk;
+      if (skipzero && k==0)
+        inout_data[i] = 0.0f;
     }
   }
+  int skipzero;
+  float kk;
 };
 }  // namespace layer
 }  // namespace cxxnet

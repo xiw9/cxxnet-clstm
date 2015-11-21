@@ -89,11 +89,27 @@ public:
     return out_;
   }
 protected:
-  inline static void LoadImage(mshadow::TensorContainer<cpu,3> &img, 
+  inline void LoadImage(mshadow::TensorContainer<cpu,3> &img, 
           DataInst &out,
           const char *fname) {
-    cv::Mat res = cv::imread(fname);
-    CHECK(res.data != NULL) << "LoadImage: Reading image" << fname << "failed.";
+    cv::Mat raw = cv::imread(fname);
+    CHECK(raw.data != NULL) << "LoadImage: Reading image" << fname << "failed.";
+  cv::Mat res;
+  int new_size = 256;
+  if (raw.rows != raw.cols) new_size = 224;
+  if (silent_){
+    new_size = 280;
+    if (raw.rows != raw.cols) new_size = 256;
+  }
+
+  if (raw.rows > raw.cols) {
+      cv::resize(raw, res, cv::Size(new_size, raw.rows * new_size / raw.cols),
+              0, 0, CV_INTER_LINEAR);
+  } else {
+      cv::resize(raw, res, cv::Size(new_size * raw.cols / raw.rows, new_size),
+              0, 0, CV_INTER_LINEAR);
+  }
+
     img.Resize(mshadow::Shape3(3, res.rows, res.cols));
     for(index_t y = 0; y < img.size(1); ++y) {
       for(index_t x = 0; x < img.size(2); ++x) {
