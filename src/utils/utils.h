@@ -83,6 +83,10 @@ inline void Check(bool exp, const char *fmt, ...) {
   }
 }
 
+inline void Assert(bool exp, const char *fmt, ...) {
+// TODO
+}
+
 /*! \brief report error message, same as check */
 inline void Error(const char *fmt, ...) {
   {

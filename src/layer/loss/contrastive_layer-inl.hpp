@@ -36,7 +36,6 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
     mshadow::Tensor<cpu, 2> lb = label.label;
     CHECK(lb.size(0) == inout_data.size(0) && lb.size(1) == 1)
       << "ContrastiveLayer: label size mismatch";
-    #pragma omp parallel for
     for (index_t i = 1; i < inout_data.size(0) ; i += 2) {
       float d = 0.0f;
       for (int j = 0; j < p; ++j)

@@ -469,7 +469,7 @@ class CXXNetLearnTask {
         batch_count = 0;
         while (itr_train->Next()) {
           batch_count ++;
-          if (batch_dump != 0 and batch_count % batch_dump == 0 && is_root){
+          if (batch_dump != 0 && batch_count % batch_dump == 0 && is_root){
             this->SaveModel();
           }
           if (test_io == 0) {

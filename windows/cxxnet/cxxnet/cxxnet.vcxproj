@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -21,38 +21,36 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{11779A85-CDB2-4692-AD04-331DFE7F4796}</ProjectGuid>
     <RootNamespace>cxxnet</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 6.5.props" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -67,13 +65,13 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(SolutionDir)\..\thirdparty\OpenCV\include;$(SolutionDir)\..\thirdparty\OpenBLAS\include;$(SolutionDir)\..\..\mshadow;$(IncludePath)</IncludePath>
-    <LibraryPath>$(CUDA_PATH)lib\x64\;$(SolutionDir)\..\thirdparty\OpenBLAS\bin\;$(SolutionDir)\..\thirdparty\OpenBLAS\lib\;$(SolutionDir)\..\thirdparty\OpenCV\x64\vc12\lib\;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\..\thirdparty\OpenCV\include;$(SolutionDir)\..\thirdparty\OpenBLAS\include;$(SolutionDir)\..\..\mshadow;$(SolutionDir)\..\..\dmlc-core\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\..\thirdparty\OpenBLAS\bin\;$(SolutionDir)\..\thirdparty\OpenBLAS\lib\;$(SolutionDir)\..\thirdparty\OpenCV\x64\vc12\lib\;$(LibraryPath)</LibraryPath>
     <OutDir>..\..\..\bin\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)\..\thirdparty\OpenCV\include;$(SolutionDir)\..\thirdparty\OpenBLAS\include;$(SolutionDir)\..\..\mshadow;$(IncludePath)</IncludePath>
-    <LibraryPath>$(CUDA_PATH)lib\x64\;$(SolutionDir)\..\thirdparty\OpenBLAS\bin\;$(SolutionDir)\..\thirdparty\OpenBLAS\lib\;$(SolutionDir)\..\thirdparty\OpenCV\x64\vc12\lib\;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\..\thirdparty\OpenCV\include;$(SolutionDir)\..\thirdparty\OpenBLAS\include;$(SolutionDir)\..\..\mshadow;$(SolutionDir)\..\..\dmlc-core\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\..\thirdparty\OpenBLAS\bin\;$(SolutionDir)\..\thirdparty\OpenBLAS\lib\;$(SolutionDir)\..\thirdparty\OpenCV\x64\vc12\lib\;$(LibraryPath)</LibraryPath>
     <OutDir>..\..\..\bin\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -91,7 +89,7 @@
       <WarningLevel>Level1</WarningLevel>
       <Optimization>Full</Optimization>
       <SDLCheck>false</SDLCheck>
-      <AdditionalOptions>/DMSHADOW_USE_CBLAS=1 /DMSHADOW_USE_MKL=0 /DCXXNET_USE_OPENCV=1 /DCXXNET_USE_CUDNN=0 /DCXXNET_USE_OPENCV_DECODER=1 /DMSHADOW_DIST_PS=0 /D__WIN__=1 /D_USE_MATH_DEFINES %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DMSHADOW_USE_CBLAS=1 /DMSHADOW_USE_MKL=0 /DCXXNET_USE_OPENCV=1 /DCXXNET_USE_CUDNN=0 /DCXXNET_USE_CUDA=0 /DCXXNET_USE_OPENCV_DECODER=1 /DMSHADOW_DIST_PS=0 /D__WIN__=1 /D_USE_MATH_DEFINES %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -100,14 +98,8 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>opencv_core2410.lib;opencv_imgproc2410.lib;opencv_highgui2410.lib;libopenblas.dll.a;cublas.lib;curand.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core2410.lib;opencv_imgproc2410.lib;opencv_highgui2410.lib;libopenblas.dll.a;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <CudaCompile>
-      <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CompileOut>$(IntDir)%(Filename)%(Extension).obj</CompileOut>
-      <AdditionalOptions>-DMSHADOW_USE_CBLAS=1 -DMSHADOW_USE_MKL=0 -DCXXNET_USE_OPENCV=1 -DCXXNET_USE_CUDNN=0 -DCXXNET_USE_OPENCV_DECODER=1 -DMSHADOW_DIST_PS=0 %(AdditionalOptions)</AdditionalOptions>
-    </CudaCompile>
-    <CudaLink />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -130,7 +122,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalOptions>/DMSHADOW_USE_CBLAS=1 /DMSHADOW_USE_MKL=0 /DCXXNET_USE_OPENCV=1 /DCXXNET_USE_CUDNN=0 /DCXXNET_USE_OPENCV_DECODER=1 /DMSHADOW_DIST_PS=0 /D__WIN__=1 /D_USE_MATH_DEFINES %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DMSHADOW_USE_CBLAS=1 /DMSHADOW_USE_MKL=0 /DCXXNET_USE_OPENCV=1 /DCXXNET_USE_CUDNN=0 /DCXXNET_USE_CUDA=0  /DCXXNET_USE_OPENCV_DECODER=1 /DMSHADOW_DIST_PS=0 /D__WIN__=1 /D_USE_MATH_DEFINES %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -140,14 +132,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>opencv_core2410.lib;opencv_imgproc2410.lib;opencv_highgui2410.lib;libopenblas.dll.a;cublas.lib;curand.lib;cudart.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_core2410.lib;opencv_imgproc2410.lib;opencv_highgui2410.lib;libopenblas.dll.a;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <CudaCompile>
-      <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CompileOut>$(IntDir)%(Filename)%(Extension).obj</CompileOut>
-      <AdditionalOptions>-DMSHADOW_USE_CBLAS=1 -DMSHADOW_USE_MKL=0 -DCXXNET_USE_OPENCV=1 -DCXXNET_USE_CUDNN=0 -DCXXNET_USE_OPENCV_DECODER=1 -DMSHADOW_DIST_PS=0 %(AdditionalOptions)</AdditionalOptions>
-    </CudaCompile>
-    <CudaLink />
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\cxxnet_main.cpp" />
@@ -200,6 +186,7 @@
     <ClInclude Include="..\..\..\src\io\iter_attach_txt-inl.hpp" />
     <ClInclude Include="..\..\..\src\io\iter_augment_proc-inl.hpp" />
     <ClInclude Include="..\..\..\src\io\iter_batch_proc-inl.hpp" />
+    <ClInclude Include="..\..\..\src\io\iter_image_recordio-inl.hpp" />
     <ClInclude Include="..\..\..\src\io\iter_img-inl.hpp" />
     <ClInclude Include="..\..\..\src\io\iter_mem_buffer-inl.hpp" />
     <ClInclude Include="..\..\..\src\io\iter_mnist-inl.hpp" />
@@ -255,21 +242,9 @@
     <ClInclude Include="..\..\..\src\utils\utils.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\mshadow\mshadow\cuda\reduce.cuh" />
-    <None Include="..\..\..\mshadow\mshadow\cuda\tensor_gpu-inl.cuh" />
-    <None Include="..\..\..\mshadow\mshadow\README.md" />
-    <CudaCompile Include="..\..\..\src\layer\layer_impl.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
-    <CudaCompile Include="..\..\..\src\nnet\nnet_impl.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
-    <CudaCompile Include="..\..\..\src\updater\updater_impl.cu">
-      <FileType>Document</FileType>
-    </CudaCompile>
+    <ProjectReference Include="..\..\..\dmlc-core\windows\dmlc\dmlc.vcxproj">
+      <Project>{6e6dda36-69ba-4555-ba88-10166b11f2d2}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 6.5.targets" />
-  </ImportGroup>
 </Project>

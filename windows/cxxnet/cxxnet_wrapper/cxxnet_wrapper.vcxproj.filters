@@ -188,15 +188,4 @@
       <UniqueIdentifier>{8a072b9b-aea2-4aa2-a7ba-5ae79e2f36fc}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="..\..\..\src\layer\layer_impl.cu">
-      <Filter>layer</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\..\src\updater\updater_impl.cu">
-      <Filter>updater</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\..\src\nnet\nnet_impl.cu">
-      <Filter>nnet</Filter>
-    </CudaCompile>
-  </ItemGroup>
 </Project>

@@ -12,6 +12,7 @@ iterator
 #include <dmlc/logging.h>
 #include <dmlc/recordio.h>
 // this code needs c++11
+#define DMLC_USE_CXX11 1
 #if DMLC_USE_CXX11
 #include <dmlc/threadediter.h>
 #include <unordered_map>

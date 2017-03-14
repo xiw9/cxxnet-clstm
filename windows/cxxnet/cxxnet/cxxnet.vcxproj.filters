@@ -300,6 +300,9 @@
     <ClInclude Include="..\..\..\mshadow\mshadow-ps\thread_util.h">
       <Filter>mshadow-ps</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\io\iter_image_recordio-inl.hpp">
+      <Filter>io</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="nnet">
@@ -332,21 +335,5 @@
     <Filter Include="mshadow-ps">
       <UniqueIdentifier>{940b0137-1cfe-4715-81f7-9e97d27e3d04}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\mshadow\mshadow\README.md">
-      <Filter>mshadow</Filter>
-    </None>
-    <None Include="..\..\..\mshadow\mshadow\cuda\reduce.cuh">
-      <Filter>mshadow\cuda</Filter>
-    </None>
-    <None Include="..\..\..\mshadow\mshadow\cuda\tensor_gpu-inl.cuh">
-      <Filter>mshadow\cuda</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="..\..\..\src\layer\layer_impl.cu" />
-    <CudaCompile Include="..\..\..\src\nnet\nnet_impl.cu" />
-    <CudaCompile Include="..\..\..\src\updater\updater_impl.cu" />
   </ItemGroup>
 </Project>
