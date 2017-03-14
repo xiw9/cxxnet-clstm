@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
   } else {
     LOG(INFO) << "Keep origin image size";
   }
-  
+  int skip = 0;
   using namespace dmlc;
   const static size_t kBufferSize = 1 << 20UL;
   std::string root = argv[2];
@@ -103,8 +103,22 @@ int main(int argc, char *argv[]) {
     }
     delete fi;
     if (new_size > 0) {
-      cv::Mat img = cv::imdecode(decode_buf, CV_LOAD_IMAGE_COLOR);
-      CHECK(img.data != NULL) << "OpenCV decode fail:" << path;
+      cv::Mat img;
+      try{
+        img = cv::imdecode(decode_buf, CV_LOAD_IMAGE_COLOR);
+      }catch(...){
+        img.data = NULL;
+      }
+//      CHECK(img.data != NULL) << "OpenCV decode fail:" << path;
+      if (skip){
+        skip = 0;
+        continue;
+      }
+      if (img.data == NULL){
+        std::cout<<path<<std::endl;
+        skip = 1;
+        continue;
+      }
       cv::Mat res;
       if (img.rows > img.cols) {
         cv::resize(img, res, cv::Size(new_size, img.rows * new_size / img.cols),

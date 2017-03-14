@@ -47,6 +47,8 @@ class CXXNetLearnTask {
     weight_name = "wmat";
     extract_layer_name = "";
     weight_filename = "";
+    batch_count = 0;
+    batch_dump = 0;
 #if MSHADOW_USE_CUDA
     this->SetParam("dev", "gpu");
 #else
@@ -142,6 +144,7 @@ class CXXNetLearnTask {
     if (!strcmp(name, "extract_node_name"))         extract_node_name = val;
     if (!strcmp(name, "extract_layer_name"))         extract_layer_name = val;
     if (!strcmp(name, "weight_filename"))         weight_filename = val;
+    if (!strcmp(name, "batch_dump"))           batch_dump = atoi(val);
     if (!strcmp(name, "output_format")) {
       if  (!strcmp(val, "txt")) output_format = 1;
       else output_format = 0;
@@ -216,7 +219,7 @@ class CXXNetLearnTask {
   // save model into file
   inline void SaveModel(void) {
     char name[256];
-    sprintf(name,"%s/%04d.model" , name_model_dir.c_str(), start_counter ++);
+    sprintf(name,"%s/%04d-%06d.model" , name_model_dir.c_str(), start_counter, batch_count);
     if (save_period == 0 || start_counter % save_period != 0) return;
     dmlc::Stream *fo = dmlc::Stream::Create(name, "w");
     fo->Write(&net_type, sizeof(int));
@@ -463,7 +466,12 @@ class CXXNetLearnTask {
         int sample_counter = 0;
         net_trainer->StartRound(start_counter);
         itr_train->BeforeFirst();
+        batch_count = 0;
         while (itr_train->Next()) {
+          batch_count ++;
+          if (batch_dump != 0 and batch_count % batch_dump == 0 && is_root){
+            this->SaveModel();
+          }
           if (test_io == 0) {
             net_trainer->Update(itr_train->Value());
           }
@@ -504,6 +512,7 @@ class CXXNetLearnTask {
         elapsed = (unsigned long)(time(NULL) - start);
         if (is_root) {
           this->SaveModel();
+          start_counter ++;
         }
       }
 
@@ -576,7 +585,8 @@ class CXXNetLearnTask {
   std::string weight_filename;
   /*! \brief wmat of bias */
   std::string weight_name;
- };
+  int batch_count, batch_dump;
+};
 }  // namespace cxxnet
 
 // general main for PS

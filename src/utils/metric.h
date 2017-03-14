@@ -118,8 +118,12 @@ struct MetricContrast : public MetricBase{
     for (index_t i = 0; i < predscore.size(0) / 2; ++i) {
       dist += (predscore[i] - predscore[i + k]) * (predscore[i] - predscore[i + k]);
     }
-    if (label[0] > 0.5)
-      diff += dist;
+    if (label[0] > 0.5){
+       if (m * m > dist)
+         diff += dist;
+       else
+         diff += m * m; // * 0.99f + 0.01f * dist;
+    }
     else
       diff += std::max(0.0f, m * m - dist);
     return diff;

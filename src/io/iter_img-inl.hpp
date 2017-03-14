@@ -97,9 +97,13 @@ protected:
   cv::Mat res;
   int new_size = 256;
   if (raw.rows != raw.cols) new_size = 224;
-  if (silent_){
+  if (silent_ == 1){
     new_size = 280;
     if (raw.rows != raw.cols) new_size = 256;
+  }
+  if (silent_ == 2){
+    new_size = 268;
+    if (raw.rows != raw.cols) new_size = 240;
   }
 
   if (raw.rows > raw.cols) {

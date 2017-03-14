@@ -38,15 +38,18 @@ class ContrastiveLossLayer: public LossLayerBase<xpu> {
       << "ContrastiveLayer: label size mismatch";
     #pragma omp parallel for
     for (index_t i = 1; i < inout_data.size(0) ; i += 2) {
+      float d = 0.0f;
+      for (int j = 0; j < p; ++j)
+        d += (inout_data[i][j] - inout_data[i][j + p]) * (inout_data[i][j] - inout_data[i][j + p]);
+
       if (lb[i][0] > 0.5f){ //postive pair
-	for (int j = 0; j < p; ++j){
+     	for (int j = 0; j < p; ++j){
 	  inout_data[i][j] = 2.0f * (inout_data[i][j] - inout_data[i][j + p]);
+          if (d > m * m)
+            inout_data[i][j] = 0; //inout_data[i][j] * 0.01f;
 	  inout_data[i][j + p] = -1.0f * inout_data[i][j];
 	}
       }else{ //neg
-        float d = 0.0f;
-        for (int j = 0; j < p; ++j)
-          d += (inout_data[i][j] - inout_data[i][j + p]) * (inout_data[i][j] - inout_data[i][j + p]);
 	for (int j = 0; j < p; ++j){
 	  if (d < m * m) {
 	    inout_data[i][j] = -2.0f * (inout_data[i][j] - inout_data[i][j + p]);
