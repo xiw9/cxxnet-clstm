@@ -83,8 +83,16 @@ inline void Check(bool exp, const char *fmt, ...) {
   }
 }
 
+/*! \brief assert an condition is true, use this to handle debug information */
 inline void Assert(bool exp, const char *fmt, ...) {
-// TODO
+	if (!exp) {
+		std::string msg(kPrintBuffer, '\0');
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(&msg[0], kPrintBuffer, fmt, args);
+		va_end(args);
+		HandleAssertError(msg.c_str());
+	}
 }
 
 /*! \brief report error message, same as check */
